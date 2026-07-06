@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mimic — AV Dashboard</title>
+<style>
+  :root { --bg: #0f1117; --card: #1a1d27; --border: #2a2d3a; --accent: #6366f1; --green: #22c55e; --red: #ef4444; --yellow: #eab308; --text: #e2e8f0; --muted: #94a3b8; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+  header h1 { font-size: 1.5rem; font-weight: 700; }
+  header h1 span { color: var(--accent); }
+  .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .tab { padding: 0.5rem 1rem; border-radius: 0.5rem; background: var(--card); border: 1px solid var(--border); cursor: pointer; color: var(--muted); font-size: 0.875rem; }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1rem; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card { text-align: center; }
+  .stat-card .value { font-size: 2rem; font-weight: 700; }
+  .stat-card .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card.infected .value { color: var(--red); }
+  .stat-card.suspicious .value { color: var(--yellow); }
+  .stat-card.clean .value { color: var(--green); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { text-align: left; color: var(--muted); padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border); font-weight: 500; }
+  td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+  .badge-infected { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-suspicious { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .badge-clean { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-error { background: rgba(148,163,184,0.15); color: var(--muted); }
+  .upload-zone { border: 2px dashed var(--border); border-radius: 0.75rem; padding: 2rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); }
+  .upload-zone input { display: none; }
+  .search-box { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .search-box input { flex: 1; padding: 0.5rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 0.5rem; color: var(--text); font-size: 0.875rem; }
+  .search-box button, .btn { padding: 0.5rem 1rem; background: var(--accent); color: #fff; border: none; border-radius: 0.5rem; cursor: pointer; font-size: 0.875rem; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #panel { display: none; }
+  #panel.active { display: block; }
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; }
+  .truncate { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .plugins-list { list-style: none; }
+  .plugins-list li { padding: 0.25rem 0; font-size: 0.85rem; }
+  .plugins-list li:before { content: '✓ '; color: var(--green); }
+  .scanner-off { color: var(--muted); }
+  .scanner-off:before { content: '○ '; }
+  .why-btn { padding: 0.2rem 0.5rem; font-size: 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 0.35rem; cursor: pointer; color: var(--accent); }
+  .why-btn:hover { background: var(--border); }
+  .decision-details { font-size: 0.8rem; margin-top: 0.5rem; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem; border: 1px solid var(--border); text-align: left; max-width: 480px; }
+  .decision-details .section { margin-bottom: 0.5rem; }
+  .decision-details .section:last-child { margin-bottom: 0; }
+  .decision-details .section-title { font-weight: 600; color: var(--muted); margin-bottom: 0.25rem; font-size: 0.7rem; text-transform: uppercase; }
+  .decision-details .threat { padding: 0.2rem 0; }
+  .decision-details .threat-name { font-weight: 500; }
+  .decision-details .threat-why { color: var(--muted); font-size: 0.75rem; margin-top: 0.1rem; }
+  .result-row { display: flex; align-items: flex-start; gap: 1rem; padding: 0.75rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .result-row:last-child { border-bottom: none; }
+  .result-row .verdict-col { flex-shrink: 0; }
+  .result-row .file-col { flex: 1; min-width: 140px; }
+  .result-row .file-name { font-weight: 600; }
+  .result-row .file-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
+  .result-row .threats-col { font-size: 0.8rem; min-width: 200px; max-width: 360px; }
+  .result-block { margin-top: 0.35rem; }
+  .result-block:first-child { margin-top: 0; }
+  .result-block .block-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 0.15rem; }
+  .result-block .block-content { font-size: 0.8rem; }
+  .result-block.clamav .block-content { color: var(--red); }
+  .result-block.mimic .block-content { color: var(--yellow); }
+  .result-block.yara .block-content { color: var(--accent); }
+  .result-block .block-content.empty { color: var(--muted); font-style: italic; }
+  .result-block .threat-line { margin-top: 0.15rem; }
+  .result-block .threat-line:first-child { margin-top: 0; }
+  .result-block .block-why { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
+  .result-row .why-col { flex-shrink: 0; }
+  .sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.5rem; font-size: 0.8rem; }
+  .sig-grid .sig-item { background: var(--bg); padding: 0.35rem 0.5rem; border-radius: 0.35rem; text-align: center; }
+  .sig-grid .sig-item .v { font-weight: 700; color: var(--accent); }
+  .sig-grid .sig-item .l { color: var(--muted); font-size: 0.7rem; }
+  .threats-cell { max-width: 320px; vertical-align: bottom; }
+  .threats-cell .result-block { margin-top: 0.25rem; }
+  .threats-cell .result-block:first-child { margin-top: 0; }
+  table.result-table td { vertical-align: bottom; }
+  table.result-table th.col-sha256,
+  table.result-table td.col-sha256 { width: 12rem; min-width: 12rem; max-width: 12rem; box-sizing: border-box; }
+  td.col-sha256 { padding: 0.6rem 0.5rem; vertical-align: bottom; overflow: hidden; }
+  .hash-cell-inner { display: flex; align-items: center; gap: 0.35rem; min-width: 0; max-width: 100%; font-size: 0.8rem; }
+  .hash-cell-inner .hash-text { font-family: 'SF Mono', 'Fira Code', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+  .copy-hash-btn { cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.7rem; border-radius: 0.25rem; background: var(--card); border: 1px solid var(--border); color: var(--muted); flex-shrink: 0; }
+  .copy-hash-btn:hover { color: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><span>Mimic</span> Dashboard</h1>
+    <div class="mono" style="color:var(--muted)">v0.1.0</div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-panel="dashboard">Dashboard</div>
+    <div class="tab" data-panel="scan">Scan File</div>
+    <div class="tab" data-panel="sessions">Sessions</div>
+    <div class="tab" data-panel="search-panel">Search</div>
+  </div>
+
+  <div id="dashboard" class="active" style="display:block">
+    <div class="stats-grid" id="stats-cards"></div>
+    <div class="card">
+      <h3 style="margin-bottom:0.75rem">Available Plugins &amp; Scanners</h3>
+      <div id="plugins-card"><div class="spinner"></div> Loading…</div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:0.75rem">Recent Detections</h3>
+      <table class="result-table"><thead><tr><th>File</th><th>Verdict</th><th>Threats</th><th class="col-sha256">SHA256</th><th>Time</th><th>Decision</th></tr></thead><tbody id="recent-detections"></tbody></table>
+    </div>
+  </div>
+
+  <div id="scan" style="display:none">
+    <div class="card">
+      <div class="upload-zone" id="dropzone">
+        <p style="font-size:1.1rem;margin-bottom:0.5rem">Drop files here or click to upload</p>
+        <p style="color:var(--muted);font-size:0.85rem">Files are scanned locally — not uploaded to any cloud</p>
+        <input type="file" id="file-input" multiple>
+      </div>
+      <div id="scan-results" style="margin-top:1rem"></div>
+    </div>
+  </div>
+
+  <div id="sessions" style="display:none">
+    <div class="card">
+      <h3 style="margin-bottom:0.75rem">Scan Sessions</h3>
+      <table><thead><tr><th>Date</th><th>Path</th><th>Files</th><th>Infected</th><th>Duration</th><th></th></tr></thead><tbody id="sessions-list"></tbody></table>
+    </div>
+    <div class="card" id="session-detail" style="display:none">
+      <h3 style="margin-bottom:0.75rem">Session Records</h3>
+      <table class="result-table"><thead><tr><th>File</th><th>Verdict</th><th>Threats</th><th class="col-sha256">SHA256</th><th>Scan Time</th><th>Decision</th></tr></thead><tbody id="session-records"></tbody></table>
+    </div>
+  </div>
+
+  <div id="search-panel" style="display:none">
+    <div class="card">
+      <h3 style="margin-bottom:0.75rem">Search by Hash</h3>
+      <div class="search-box">
+        <input type="text" id="hash-input" placeholder="SHA256 or MD5 hash...">
+        <button onclick="doSearch()">Search</button>
+      </div>
+      <table class="result-table"><thead><tr><th>File</th><th>Verdict</th><th>Threats</th><th class="col-sha256">SHA256</th><th>Date</th><th>Decision</th></tr></thead><tbody id="search-results"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return document.querySelectorAll(sel); }
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    $$('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    ['dashboard','scan','sessions','search-panel'].forEach(p => {
+      const el = document.getElementById(p);
+      if (el) el.style.display = t.dataset.panel === p ? 'block' : 'none';
+    });
+    if (t.dataset.panel === 'dashboard') loadDashboard();
+    if (t.dataset.panel === 'sessions') loadSessions();
+  });
+});
+
+function badge(verdict) {
+  const v = (verdict || '').toLowerCase();
+  return `<span class="badge badge-${v}">${verdict || '—'}</span>`;
+}
+function shortHash(h) { return h ? h.substring(0,16)+'…' : '—'; }
+function shortPath(p) { return p ? (p.split('/').pop() || p) : '—'; }
+
+function sha256Cell(sha256) {
+  if (!sha256) return '<td class="col-sha256">—</td>';
+  const attr = ('' + sha256).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const text = escapeHtml(shortHash(sha256));
+  return '<td class="col-sha256"><div class="hash-cell-inner"><span class="hash-text">' + text + '</span><button type="button" class="copy-hash-btn" data-sha256="' + attr + '" title="Copy SHA256">Copy</button></div></td>';
+}
+
+function copyHashToClipboard(hash) {
+  if (!hash) return Promise.resolve(false);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(hash).then(() => true).catch(() => false);
+  }
+  const ta = document.createElement('textarea');
+  ta.value = hash;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return Promise.resolve(ok);
+  } catch (err) {
+    document.body.removeChild(ta);
+    return Promise.resolve(false);
+  }
+}
+
+document.body.addEventListener('click', (e) => {
+  const btn = e.target.closest('.copy-hash-btn[data-sha256]');
+  if (!btn) return;
+  const hash = btn.getAttribute('data-sha256');
+  if (!hash) return;
+  e.preventDefault();
+  e.stopPropagation();
+  copyHashToClipboard(hash).then((ok) => {
+    const orig = btn.textContent;
+    btn.textContent = ok ? 'Copied!' : 'Copy';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+});
+
+function formatDecisionDetails(verdict, vtResult) {
+  if (!verdict) return '';
+  const sig = (verdict.signature_threats || []).map(t =>
+    `<div class="threat"><span class="threat-name">${escapeHtml(t.name)}</span> (${escapeHtml(t.signature_type || '')})${t.match_reason ? `<div class="threat-why">${escapeHtml(t.match_reason)}</div>` : ''}</div>`
+  ).join('');
+  const mimic = (verdict.mimic_threats || []).map(t =>
+    `<div class="threat"><span class="threat-name">${escapeHtml(t.id)}</span>: ${escapeHtml(t.description)}${t.reference ? ` <a href="${escapeHtml(t.reference)}" target="_blank" rel="noopener">ref</a>` : ''}</div>`
+  ).join('');
+  const yara = (verdict.yara_matches || []).map(m =>
+    `<div class="threat"><span class="threat-name">${escapeHtml(m.namespace || '')}::${escapeHtml(m.rule || '')}</span>${(m.tags && m.tags.length) ? ' [' + m.tags.map(escapeHtml).join(', ') + ']' : ''}</div>`
+  ).join('');
+  let vtHtml = '';
+  if (vtResult) {
+    if (vtResult.found && vtResult.positives != null) {
+      const link = vtResult.permalink ? `<a href="${escapeHtml(vtResult.permalink)}" target="_blank" rel="noopener">VirusTotal</a>` : 'VirusTotal';
+      vtHtml = `<div class="section"><div class="section-title">${link}</div><div class="threat">${vtResult.positives}/${vtResult.total != null ? vtResult.total : '?'} engines</div>${(vtResult.detections || []).slice(0, 10).map(d => `<div class="threat"><span class="threat-name">${escapeHtml(d[0])}</span>: ${escapeHtml(d[1])}</div>`).join('')}</div>`;
+    } else {
+      vtHtml = `<div class="section"><div class="section-title">VirusTotal</div><div class="threat">Hash not found or not yet scanned</div></div>`;
+    }
+  }
+  let html = '';
+  if (sig) html += `<div class="section"><div class="section-title">ClamAV</div>${sig}</div>`;
+  if (mimic) html += `<div class="section"><div class="section-title">mimic-detect</div>${mimic}</div>`;
+  if (yara) html += `<div class="section"><div class="section-title">YARA</div>${yara}</div>`;
+  if (vtHtml) html += vtHtml;
+  return html || '<span style="color:var(--muted)">Clean — no threats</span>';
+}
+function escapeHtml(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+function decisionCell(verdictOrResultOrJson, rowId) {
+  let verdict, vtResult;
+  const raw = typeof verdictOrResultOrJson === 'string' ? (function(){ try { return JSON.parse(verdictOrResultOrJson); } catch(_){ return null; } })() : verdictOrResultOrJson;
+  if (raw && raw.scan_verdict !== undefined) {
+    verdict = raw.scan_verdict;
+    vtResult = raw.vt || null;
+  } else {
+    verdict = raw;
+    vtResult = null;
+  }
+  const content = formatDecisionDetails(verdict, vtResult);
+  if (!content) return '<td>—</td>';
+  const id = 'decision-' + (rowId || Math.random().toString(36).slice(2));
+  return `<td><button type="button" class="why-btn" onclick="toggleDecision('${id}')">Why?</button><div id="${id}" class="decision-details" style="display:none">${content}</div></td>`;
+}
+function toggleDecision(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function threatBlocksHtml(verdictOrJson) {
+  const v = typeof verdictOrJson === 'string' ? (function(){ try { return JSON.parse(verdictOrJson); } catch(_){ return null; } })() : verdictOrJson;
+  if (!v) return '<span class="result-block block-content empty">—</span>';
+  const sigs = (v.signature_threats || []);
+  const clamavContent = sigs.length === 0 ? '—' : sigs.map(t => {
+    const name = escapeHtml(t.name || '');
+    const type = (t.signature_type && t.signature_type !== 'unknown') ? ' (' + escapeHtml(t.signature_type) + ')' : '';
+    const why = t.match_reason ? '<div class="block-why">' + escapeHtml(t.match_reason) + '</div>' : '';
+    return `<div class="threat-line">${name}${type}${why}</div>`;
+  }).join('');
+  const mimic = (v.mimic_threats || []).map(t => t.id + ': ' + (t.description || ''));
+  const yara = (v.yara_matches || []).map(m => (m.namespace ? m.namespace + '::' : '') + (m.rule || ''));
+  const block = (cls, label, names) => {
+    const has = names && names.length > 0;
+    const content = has ? escapeHtml(names.slice(0, 5).join(', ') + (names.length > 5 ? '…' : '')) : '—';
+    return `<div class="result-block ${cls}"><div class="block-label">${label}</div><div class="block-content${has ? '' : ' empty'}">${content}</div></div>`;
+  };
+  const clamavBlock = `<div class="result-block clamav"><div class="block-label">ClamAV</div><div class="block-content${sigs.length ? '' : ' empty'}">${clamavContent}</div></div>`;
+  return clamavBlock + block('mimic', 'mimic-detect', mimic) + block('yara', 'YARA', yara);
+}
+
+async function loadPlugins() {
+  try {
+    const p = await fetch(API+'/api/plugins').then(r=>r.json());
+    const wasmList = (p.wasm_plugins || []).map(n => `<li>WASM: ${escapeHtml(n)}</li>`).join('');
+    const builtinList = (p.builtin_plugins || []).map(n => `<li>Built-in: ${escapeHtml(n)}</li>`).join('');
+    const wasm = (wasmList || builtinList) ? `<ul class="plugins-list">${wasmList}${builtinList}</ul>` : '<p class="scanner-off">No plugins loaded (use --plugin for WASM or path/mimic-vt.wasm)</p>';
+    const yara = p.yara_loaded ? '<p class="plugins-list"><li>YARA rules loaded</li></p>' : '<p class="scanner-off">YARA not loaded</p>';
+    const vt = p.vt_configured ? '<p class="plugins-list"><li>VirusTotal (hash lookup): active</li></p>' : '<p class="scanner-off">VirusTotal: not loaded (use --plugin path/mimic-vt.wasm and --vt-key)</p>';
+    let sig = '';
+    if (p.signatures_loaded) {
+      const total = (p.signature_count || 0).toLocaleString();
+      const b = p.signature_breakdown;
+      if (b && typeof b === 'object') {
+        const items = [
+          ['md5_sigs', 'MD5'], ['sha256_sigs', 'SHA256'], ['mdb_sigs', 'MDB'], ['msb_sigs', 'MSB'],
+          ['ndb_fixed', 'NDB fixed'], ['ndb_wildcard', 'NDB wild'], ['ldb_sigs', 'LDB'], ['cdb_sigs', 'CDB'],
+          ['bytecode_sigs', 'Bytecode'], ['fp_sigs', 'FP']
+        ].filter(([k]) => (b[k] || 0) > 0).map(([k, l]) => `<div class="sig-item"><span class="v">${Number(b[k]).toLocaleString()}</span><br><span class="l">${l}</span></div>`).join('');
+        sig = `<div><strong>ClamAV signatures: ${total} total</strong><div class="sig-grid" style="margin-top:0.5rem">${items || '<span class="scanner-off">No breakdown</span>'}</div></div>`;
+      } else {
+        sig = `<p class="plugins-list"><li>ClamAV signatures: ${total} loaded</li></p>`;
+      }
+    } else {
+      sig = '<p class="scanner-off">ClamAV signatures not loaded</p>';
+    }
+    $('#plugins-card').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem">${wasm}${yara}${vt}${sig}</div>`;
+  } catch(e) { $('#plugins-card').innerHTML = '<p style="color:var(--muted)">Could not load plugins</p>'; }
+}
+
+async function loadDashboard() {
+  try {
+    loadPlugins();
+    const stats = await fetch(API+'/api/stats').then(r=>r.json());
+    $('#stats-cards').innerHTML = `
+      <div class="card stat-card"><div class="value">${stats.total_files_scanned}</div><div class="label">Files Scanned</div></div>
+      <div class="card stat-card infected"><div class="value">${stats.total_infected}</div><div class="label">Infected</div></div>
+      <div class="card stat-card suspicious"><div class="value">${stats.total_suspicious}</div><div class="label">Suspicious</div></div>
+      <div class="card stat-card clean"><div class="value">${stats.unique_hashes}</div><div class="label">Unique Hashes</div></div>
+      <div class="card stat-card"><div class="value">${(stats.total_bytes_scanned/1048576).toFixed(0)} MB</div><div class="label">Data Scanned</div></div>
+      <div class="card stat-card"><div class="value">${stats.total_sessions}</div><div class="label">Sessions</div></div>
+    `;
+    const infected = await fetch(API+'/api/records/infected?limit=20').then(r=>r.json());
+    $('#recent-detections').innerHTML = infected.map((r,i) => `
+      <tr><td class="truncate">${shortPath(r.path)}</td><td>${badge(r.verdict)}</td><td class="threats-cell">${threatBlocksHtml(r.threats_json)}</td>${sha256Cell(r.sha256)}<td>${r.scanned_at ? r.scanned_at.substring(0,19) : '—'}</td>${decisionCell(r.threats_json, 'rec-' + i)}</tr>
+    `).join('') || '<tr><td colspan="6" style="color:var(--muted)">No detections yet</td></tr>';
+  } catch(e) { console.error(e); }
+}
+
+async function loadSessions() {
+  try {
+    const sessions = await fetch(API+'/api/sessions?limit=50').then(r=>r.json());
+    $('#sessions-list').innerHTML = sessions.map(s => `
+      <tr>
+        <td>${s.started_at.substring(0,19)}</td>
+        <td class="truncate">${s.scan_path}</td>
+        <td>${s.total_files}</td>
+        <td>${s.infected > 0 ? '<span style="color:var(--red)">'+s.infected+'</span>' : '0'}</td>
+        <td>${s.duration_ms > 1000 ? (s.duration_ms/1000).toFixed(1)+'s' : s.duration_ms+'ms'}</td>
+        <td><a href="#" onclick="loadSession('${s.id}');return false">view</a></td>
+      </tr>
+    `).join('') || '<tr><td colspan="6" style="color:var(--muted)">No sessions</td></tr>';
+  } catch(e) { console.error(e); }
+}
+
+async function loadSession(id) {
+  try {
+    const records = await fetch(API+`/api/sessions/${id}/records?limit=500`).then(r=>r.json());
+    $('#session-detail').style.display = 'block';
+    $('#session-records').innerHTML = records.map((r,i) => `
+      <tr><td class="truncate">${shortPath(r.path)}</td><td>${badge(r.verdict)}</td><td class="threats-cell">${threatBlocksHtml(r.threats_json)}</td>${sha256Cell(r.sha256)}<td>${r.scan_duration_us > 1000 ? (r.scan_duration_us/1000).toFixed(1)+'ms' : r.scan_duration_us+'us'}</td>${decisionCell(r.threats_json, 'sess-'+id+'-'+i)}</tr>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function doSearch() {
+  const hash = $('#hash-input').value.trim();
+  if (!hash) return;
+  try {
+    const records = await fetch(API+`/api/search?hash=${encodeURIComponent(hash)}`).then(r=>r.json());
+    $('#search-results').innerHTML = records.map((r,i) => `
+      <tr><td class="truncate">${shortPath(r.path)}</td><td>${badge(r.verdict)}</td><td class="threats-cell">${threatBlocksHtml(r.threats_json)}</td>${sha256Cell(r.sha256)}<td>${r.scanned_at ? r.scanned_at.substring(0,19) : '—'}</td>${decisionCell(r.threats_json, 'search-'+i)}</tr>
+    `).join('') || '<tr><td colspan="6" style="color:var(--muted)">No results</td></tr>';
+  } catch(e) { console.error(e); }
+}
+
+const dz = $('#dropzone'), fi = $('#file-input');
+dz.addEventListener('click', () => fi.click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); uploadFiles(e.dataTransfer.files); });
+fi.addEventListener('change', () => uploadFiles(fi.files));
+
+async function uploadFiles(files) {
+  if (!files.length) return;
+  const sr = $('#scan-results');
+  sr.innerHTML = '<div class="spinner"></div> Scanning...';
+  const fd = new FormData();
+  for (const f of files) fd.append('file', f);
+  try {
+    const resp = await fetch(API+'/api/scan', { method: 'POST', body: fd }).then(r=>r.json());
+    sr.innerHTML = '<table class="result-table"><thead><tr><th>File</th><th>Verdict</th><th>Threats</th><th class="col-sha256">SHA256</th><th>Scan Time</th><th>Decision</th></tr></thead><tbody>' +
+      (resp.results||[]).map((r,i) => {
+        const v = r.scan_verdict;
+        return `<tr><td>${shortPath(r.path||'')}</td><td>${badge(v?.verdict||'ERROR')}</td><td class="threats-cell">${threatBlocksHtml(v)}</td>${sha256Cell(r.sha256)}<td>${r.scan_duration_us > 1000 ? (r.scan_duration_us/1000).toFixed(1)+'ms' : (r.scan_duration_us||0)+'us'}</td>${decisionCell(r, 'scan-'+i)}</tr>`;
+      }).join('') + '</tbody></table>';
+  } catch(e) { sr.innerHTML = '<p style="color:var(--red)">Scan failed: '+escapeHtml(e+'')+'</p>'; }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

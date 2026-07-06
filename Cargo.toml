@@ -1,0 +1,60 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mimic-core",
+    "crates/mimic-signatures",
+    "crates/mimic-engine",
+    "crates/mimic-sandbox",
+    "crates/mimic-detect",
+    "crates/mimic-wasm",
+    "crates/mimic-vt",
+    "crates/mimic-db",
+    "crates/mimic-web",
+    "crates/mimic-cli",
+    "crates/mimic-browser",
+    "crates/mimic-view",
+    "crates/mimic-mcp",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/IsMyPhonePwned/mimic"
+
+[workspace.dependencies]
+mimic-core = { path = "crates/mimic-core" }
+mimic-signatures = { path = "crates/mimic-signatures" }
+mimic-engine = { path = "crates/mimic-engine" }
+mimic-sandbox = { path = "crates/mimic-sandbox" }
+mimic-detect = { path = "crates/mimic-detect" }
+mimic-wasm = { path = "crates/mimic-wasm" }
+mimic-vt = { path = "crates/mimic-vt" }
+mimic-db = { path = "crates/mimic-db" }
+mimic-web = { path = "crates/mimic-web" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rayon = "1.10"
+memmap2 = "0.9"
+sha2 = "0.10"
+md-5 = "0.10"
+aho-corasick = "1.1"
+flate2 = "1.0"
+tar = "0.4"
+hex = "0.4"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4.4", features = ["derive", "env"] }
+walkdir = "2.5"
+crossbeam-channel = "0.5"
+wasmtime = "22"
+yara-x = "0.12"
+indicatif = "0.17"
+tokio = { version = "1", features = ["full"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["cors", "fs"] }
+uuid = { version = "1", features = ["v4", "serde"] }

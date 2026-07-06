@@ -1,0 +1,13 @@
+[package]
+name = "mimic-wasm"
+description = "WASM plugin loader for Mimic AV: load .wasm files to run additional checks during scan"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+mimic-core = { workspace = true }
+wasmtime = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }

@@ -1,0 +1,29 @@
+[package]
+name = "mimic-cli"
+description = "Command-line interface for Mimic AV engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "mimic"
+path = "src/main.rs"
+
+[dependencies]
+mimic-core = { workspace = true }
+mimic-signatures = { workspace = true }
+mimic-engine = { workspace = true }
+mimic-sandbox = { workspace = true }
+mimic-db = { workspace = true }
+mimic-vt = { workspace = true }
+mimic-web = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+walkdir = { workspace = true }
+indicatif = { workspace = true }
+crossbeam-channel = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+chrono = { workspace = true }

@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script src="i18n.js"></script>
+    <script>if (window.MimicI18n) window.MimicI18n.applyTheme();</script>
+    <title>Mimic — Browser File Scanner</title>
+    <style>
+        :root, .theme-dark {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #242836;
+            --border: #2e3347;
+            --text: #e1e4ed;
+            --text-dim: #8b90a5;
+            --accent: #6c8cff;
+            --accent-dim: #4a5f99;
+            --green: #4ade80;
+            --red: #f87171;
+            --orange: #fbbf24;
+            --radius: 12px;
+        }
+        .theme-light {
+            --bg: #f4f5f8;
+            --surface: #fff;
+            --surface2: #e8eaef;
+            --border: #d0d4dc;
+            --text: #1a1d27;
+            --text-dim: #5c6178;
+            --accent: #4a6cf7;
+            --accent-dim: #3d5dd9;
+            --green: #16a34a;
+            --red: #dc2626;
+            --orange: #d97706;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            width: 100%;
+            max-width: min(1680px, 100%);
+            margin: 0 auto;
+            padding: 12px clamp(12px, 2vw, 28px) 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+        header .badge {
+            font-size: 0.7rem;
+            background: var(--accent-dim);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        header .header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        header .subtitle { color: var(--text-dim); font-size: 0.85rem; }
+        header .theme-lang { display: flex; align-items: center; gap: 8px; }
+        header .theme-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; color: var(--text-dim); transition: background 0.15s, color 0.15s; }
+        header .theme-btn:hover { background: var(--border); color: var(--text); }
+        header .lang-select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; color: var(--text); cursor: pointer; min-width: 100px; }
+        header .lang-select:focus { outline: none; border-color: var(--accent); }
+        header .logo {
+            width: 56px;
+            height: 56px;
+            object-fit: contain;
+            border-radius: 10px;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 18px;
+            margin-bottom: 14px;
+        }
+        .card h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-dim);
+            margin-bottom: 16px;
+        }
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 22px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+        }
+        .drop-zone:hover, .drop-zone.active {
+            border-color: var(--accent);
+            background: rgba(108, 140, 255, 0.05);
+        }
+        .drop-zone p { color: var(--text-dim); font-size: 0.9rem; }
+        .drop-zone .formats { font-size: 0.75rem; color: var(--text-dim); margin-top: 8px; opacity: 0.7; }
+        .drop-zone input[type="file"] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .stat {
+            background: var(--surface2);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat .value { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+        .stat .label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .status-bar .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--text-dim);
+        }
+        .status-bar .dot.ready { background: var(--green); }
+        .status-bar .dot.loading { background: var(--orange); animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        #results-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            margin-bottom: 0;
+        }
+        #results-card > h2 { flex-shrink: 0; }
+        #results-card .results-toolbar { flex-shrink: 0; }
+        .results-list {
+            list-style: none;
+            flex: 1;
+            min-height: min(320px, 40vh);
+            max-height: calc(100vh - 320px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+        }
+        .results-list li {
+            display: flex;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .results-list li:last-child { border-bottom: none; }
+        .results-list .verdict {
+            font-weight: 700;
+            font-size: 0.75rem;
+            padding: 3px 10px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            flex-shrink: 0;
+        }
+        .verdict.clean { background: rgba(74, 222, 128, 0.15); color: var(--green); }
+        .verdict.infected { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+        .file-info { flex: 1 1 200px; min-width: 0; }
+        .file-info .name { font-weight: 600; word-break: break-word; }
+        .file-info .meta { font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; }
+        .threat-names {
+            font-size: 0.78rem;
+            text-align: left;
+            flex: 1 1 min(520px, 100%);
+            min-width: 0;
+        }
+        .threat-names .result-block { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+        .threat-names .result-block:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+        .threat-names .result-block .block-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); margin-bottom: 2px; }
+        .threat-names .result-block.clamav .block-label { color: var(--text-dim); }
+        .threat-names .result-block.clamav .block-content { color: var(--red); }
+        .threat-names .result-block.mimic .block-label { color: var(--text-dim); }
+        .threat-names .result-block.mimic .block-content { color: var(--orange); }
+        .threat-names .result-block.yara .block-label { color: var(--text-dim); }
+        .threat-names .result-block.yara .block-content { color: var(--accent); }
+        .threat-names .result-block .block-content.empty { color: var(--text-dim); font-style: italic; }
+        .threat-names .result-block .block-content:not(.empty) {
+            word-break: break-word;
+            line-height: 1.45;
+            max-height: 8.5em;
+            overflow-y: auto;
+        }
+        .why-match-wrap { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+        .why-match-btn { font-size: 0.72rem; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-dim); cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+        .why-match-btn:hover { color: var(--accent); border-color: var(--accent); }
+        .why-match-panel { margin-top: 8px; padding: 10px 12px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); font-size: 0.78rem; line-height: 1.45; display: none; }
+        .why-match-panel.visible { display: block; }
+        .why-match-panel .why-item { margin-bottom: 8px; }
+        .why-match-panel .why-item:last-child { margin-bottom: 0; }
+        .why-match-panel .why-name { font-weight: 600; color: var(--text); }
+        .why-match-panel .why-reason { color: var(--text-dim); margin-top: 2px; padding-left: 0; }
+        .inspect-btn { font-size: 0.7rem; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--accent); cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: background 0.15s, border-color 0.15s; }
+        .inspect-btn:hover { background: var(--border); border-color: var(--accent); }
+        .empty-state { text-align: center; padding: 40px; color: var(--text-dim); font-size: 0.85rem; }
+        .row { display: flex; gap: 14px; flex-shrink: 0; }
+        .row > * { flex: 1; min-width: 0; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface2);
+            color: var(--text);
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .btn:hover { background: var(--border); border-color: var(--accent-dim); }
+        .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .btn.primary:hover { background: var(--accent-dim); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .actions { display: flex; gap: 10px; margin-top: 12px; }
+        .one-click-wrap { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+        .one-click-wrap .btn { width: 100%; justify-content: center; }
+        .progress-wrap { margin-top: 10px; display: none; }
+        .progress-wrap.active { display: block; }
+        .progress-bar { height: 6px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+        .progress-bar .fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.15s ease; }
+        .progress-text { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; }
+        .error-msg { font-size: 0.8rem; color: var(--red); margin-top: 8px; line-height: 1.4; }
+        .error-msg code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+        .plugins label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 4px; }
+        .plugins .checkbox-label { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-weight: 500; color: var(--text); }
+        .plugins .checkbox-label input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+        .plugins input[type="text"] {
+            width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--surface2); color: var(--text); font-size: 0.85rem; margin-bottom: 12px;
+        }
+        .vt-badge { font-size: 0.7rem; color: var(--accent); margin-left: 6px; }
+        .vt-badge.found { color: var(--orange); }
+        .yara-editor {
+            width: 100%;
+            min-height: 200px;
+            max-height: min(40vh, 420px);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text);
+            font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            resize: vertical;
+            overflow: auto;
+        }
+        .yara-editor:focus { outline: none; border-color: var(--accent); }
+        .yara-status { font-size: 0.8rem; color: var(--text-dim); margin-top: 8px; }
+        .yara-status.error { color: var(--red); }
+        .yara-status.ready { color: var(--green); }
+        .yara-card-header { cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; }
+        .yara-card-header:hover { color: var(--accent); }
+        .yara-card-header .toggle { font-size: 0.75rem; transition: transform 0.2s; }
+        .yara-card.collapsed .yara-card-header .toggle { transform: rotate(-90deg); }
+        .yara-card .yara-card-body { overflow: hidden; }
+        .yara-card.collapsed .yara-card-body { display: none; }
+        .results-search { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 0.9rem; margin-bottom: 12px; }
+        .results-search::placeholder { color: var(--text-dim); }
+        .results-search:focus { outline: none; border-color: var(--accent); }
+        .mimic-detect-help { margin-top: 8px; }
+        .mimic-detect-help summary { cursor: pointer; font-size: 0.8rem; color: var(--accent); user-select: none; }
+        .mimic-detect-help summary:hover { text-decoration: underline; }
+        .mimic-detect-help .help-panel { margin-top: 10px; padding: 12px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); font-size: 0.8rem; line-height: 1.5; max-height: min(50vh, 520px); overflow-y: auto; }
+        .mimic-detect-help .help-panel h4 { font-size: 0.85rem; color: var(--text); margin: 0 0 6px 0; }
+        .mimic-detect-help .help-panel ul { margin: 0 0 12px 0; padding-left: 18px; }
+        .mimic-detect-help .help-panel li { margin-bottom: 4px; }
+        .mimic-detect-help .help-panel a { color: var(--accent); }
+        .mimic-detect-help .help-panel a:hover { text-decoration: underline; }
+        .oss-btn { padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-dim); cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+        .oss-btn:hover { background: var(--border); color: var(--text); border-color: var(--accent-dim); }
+        .oss-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
+        .oss-modal-overlay.visible { display: flex; }
+        .oss-modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); max-width: 520px; width: 100%; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        .oss-modal h3 { font-size: 1rem; padding: 20px 20px 8px; margin: 0; color: var(--text); }
+        .oss-modal .oss-intro { font-size: 0.82rem; color: var(--text-dim); padding: 0 20px 16px; line-height: 1.45; }
+        .oss-modal .oss-list { padding: 0 20px 20px; overflow-y: auto; font-size: 0.8rem; }
+        .oss-modal .oss-item { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .oss-modal .oss-item:last-child { border-bottom: none; }
+        .oss-modal .oss-name { font-weight: 600; color: var(--text); }
+        .oss-modal .oss-name a { color: var(--accent); text-decoration: none; }
+        .oss-modal .oss-name a:hover { text-decoration: underline; }
+        .oss-modal .oss-license { color: var(--text-dim); font-size: 0.75rem; }
+        .oss-modal .oss-desc { width: 100%; color: var(--text-dim); font-size: 0.75rem; margin-top: 2px; }
+        .oss-modal .oss-close { margin: 0 20px 20px; padding: 10px 18px; align-self: flex-start; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; font-size: 0.85rem; }
+        .oss-modal .oss-close:hover { background: var(--border); }
+        @media (max-width: 900px) {
+            .results-list { max-height: min(55vh, 480px); }
+        }
+        @media (max-width: 640px) { .row { flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="logo.png" alt="Mimic" class="logo">
+            <h1 data-i18n="index.title">Mimic</h1>
+            <span class="badge">WASM</span>
+            <div class="header-right">
+                <span class="subtitle" data-i18n="index.subtitle">Client-side malware scanner</span>
+                <button type="button" class="oss-btn" id="oss-summary-btn" data-i18n="index.ossSummary">Open source</button>
+                <div class="theme-lang">
+                    <button type="button" class="theme-btn" id="theme-btn" title="Toggle dark/light" aria-label="Toggle theme">🌙</button>
+                    <select class="lang-select" id="lang-select" aria-label="Language">
+                        <option value="en">English</option>
+                        <option value="fr">Français</option>
+                        <option value="br">Brezhoneg</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <div class="oss-modal-overlay" id="oss-modal" role="dialog" aria-labelledby="oss-modal-title" aria-modal="true">
+            <div class="oss-modal" id="oss-modal-content">
+                <h3 id="oss-modal-title" data-i18n="index.ossModalTitle">Open source projects</h3>
+                <p class="oss-intro" data-i18n="index.ossModalIntro">This scanner uses the following open-source projects. Click a name to open the project link.</p>
+                <div class="oss-list" id="oss-list"></div>
+                <button type="button" class="oss-close" id="oss-modal-close" data-i18n="index.ossClose">Close</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="card" id="sig-card">
+                <h2 data-i18n="index.loadSig">1. Load Signature Databases</h2>
+                <div class="drop-zone" id="sig-drop">
+                    <p data-i18n="index.dropSig">Drop signature files here or click to browse</p>
+                    <div class="formats" data-i18n="index.formatsSig">.cvd .cld .hdb .hsb .ndb .ldb .mdb .msb .fp .sfp .cdb .cbc</div>
+                    <input type="file" id="sig-input" multiple accept=".cvd,.cld,.hdb,.hsb,.ndb,.ldb,.ldu,.mdb,.msb,.fp,.sfp,.cdb,.cbc,.zip">
+                </div>
+                <div class="one-click-wrap">
+                    <button type="button" class="btn primary" id="oneclick-btn" data-i18n="index.oneClick">Download & load ClamAV DBs (one click)</button>
+                    <div class="progress-text" style="margin-top:6px;opacity:0.9;max-width:42em;" data-i18n="index.downloadNote">If one-click fails (e.g. CORS): (1) Run ./scripts/zip-data.sh in crates/mimic-browser, then serve this app from that host so data/clamav-db.zip is same-origin; or (2) Drop clamav-db.zip (or individual .cvd files) in the zone above.</div>
+                    <div class="progress-wrap" id="oneclick-progress">
+                        <div class="progress-bar"><div class="fill" id="oneclick-fill" style="width:0%"></div></div>
+                        <div class="progress-text" id="oneclick-text" data-i18n="index.downloading">Downloading…</div>
+                    </div>
+                    <div class="error-msg" id="oneclick-error" style="display:none"></div>
+                </div>
+                <div class="stats-grid" id="stats-grid" style="display:none"></div>
+                <div class="status-bar" id="sig-status">
+                    <div class="dot"></div>
+                    <span data-i18n="index.noSignatures">No signatures loaded</span>
+                </div>
+            </div>
+
+            <div class="card" id="scan-card">
+                <h2 data-i18n="index.scanFiles">2. Scan Files</h2>
+                <div class="drop-zone" id="scan-drop">
+                    <p data-i18n="index.dropScan">Drop files to scan or click to browse</p>
+                    <div class="formats" data-i18n="index.anyFile">Any file type</div>
+                    <input type="file" id="scan-input" multiple>
+                </div>
+                <div class="card" style="margin-top: 16px; padding: 16px;">
+                    <h2 style="margin-bottom: 12px;" data-i18n="index.plugins">Plugins</h2>
+                    <p class="progress-text" style="margin-bottom: 12px; font-weight: 500;" data-i18n="index.builtInDefault">Built-in by default: mimic-detect (exploit detection) and VirusTotal / mimic-vt (hash lookup). Everything runs in the browser.</p>
+                    <div class="plugins">
+                        <div class="scan-mode-wrap" style="margin-bottom: 14px;">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="mimic-detect-only" name="scan-mode" checked>
+                                <span data-i18n="index.mimicDetectOnly">mimic-detect only — scan without loading ClamAV or YARA</span>
+                            </label>
+                            <div class="progress-text" style="margin-top: 4px; margin-left: 24px;" data-i18n="index.mimicDetectOnlyDesc">When enabled, you can scan files immediately using only exploit detection (no signature DB or YARA rules required).</div>
+                        </div>
+                        <label data-i18n="index.mimicDetect">mimic-detect</label>
+                        <div class="progress-text" data-i18n="index.mimicDetectDesc">Exploit detection (DNG, RTF, TTF, PDF, RAR, ZIP) — always on.</div>
+                        <details class="mimic-detect-help">
+                            <summary data-i18n="index.featuresCves">Features &amp; CVEs detected by mimic-detect</summary>
+                            <div class="help-panel">
+                                <h4>DNG (Digital Negative)</h4>
+                                <ul>
+                                    <li><a href="https://www.cve.org/CVERecord?id=CVE-2025-43300" target="_blank" rel="noopener">CVE-2025-43300</a>: Apple RawCamera.bundle heap overflow (SamplesPerPixel vs JPEG Lossless SOF3 mismatch).</li>
+                                    <li>Related: <a href="https://project-zero.issues.chromium.org/issues/442423708" target="_blank" rel="noopener">Project Zero 442423708</a> (Android/Samsung Quram DNG exploit).</li>
+                                </ul>
+                                <h4>RTF (Rich Text Format)</h4>
+                                <ul>
+                                    <li><a href="https://msrc.microsoft.com/update-guide/vulnerability/CVE-2025-21298" target="_blank" rel="noopener">CVE-2025-21298</a>: Windows OLE Pres stream UAF (zero-click RCE).</li>
+                                    <li><a href="https://blog.synapticsystems.de/apt28-geofencing-as-a-targeting-signal-cve-2026-21509/" target="_blank" rel="noopener">CVE-2026-21509</a>: Microsoft Office security feature bypass (malformed embedded OLE).</li>
+                                </ul>
+                                <h4>TTF/OTF (TrueType/OpenType)</h4>
+                                <ul>
+                                    <li><a href="https://www.cve.org/CVERecord?id=CVE-2025-27363" target="_blank" rel="noopener">CVE-2025-27363</a>: FreeType GX/variable font subglyph OOB.</li>
+                                    <li><a href="https://securelist.com/operation-triangulation-the-last-hardware-mystery/111669/" target="_blank" rel="noopener">CVE-2023-41990</a>: Apple ADJUST instruction (Operation Triangulation; fpgm/prep/glyf).</li>
+                                </ul>
+                                <h4>PDF</h4>
+                                <ul>
+                                    <li><a href="https://pub.expmon.com/analysis/328131/" target="_blank" rel="noopener">EXPMON 328131</a> (heuristic): Adobe Acrobat Reader PDF JavaScript abuse — privileged <code>util</code> / <code>SOAP</code> APIs (<code>readFileIntoStream</code>, <code>RSS.addFeed</code>, obfuscated stream-decode chains). See <a href="https://justhaifei1.blogspot.com/2026/04/expmon-detected-sophisticated-zero-day-adobe-reader.html" target="_blank" rel="noopener">Haifei Li (Apr 2026)</a>.</li>
+                                </ul>
+                                <h4>RAR</h4>
+                                <ul>
+                                    <li><a href="https://www.welivesecurity.com/en/eset-research/update-winrar-tools-now-romcom-and-others-exploiting-zero-day-vulnerability/" target="_blank" rel="noopener">CVE-2025-8088</a>: WinRAR path traversal via Alternate Data Streams (ADS); malicious files in ADS extracted to arbitrary paths.</li>
+                                </ul>
+                                <h4>ZIP (Zombie ZIP)</h4>
+                                <ul>
+                                    <li><a href="https://github.com/bombadil-systems/zombie-zip" target="_blank" rel="noopener">CVE-2026-0866</a>: Zombie ZIP — archive declares Method=0 (stored) while payload is DEFLATE-compressed (AV evasion).</li>
+                                </ul>
+                            </div>
+                        </details>
+                        <label style="margin-top: 12px;" data-i18n="index.vtKey">VirusTotal / mimic-vt (optional API key)</label>
+                        <input type="password" id="vt-apikey" data-i18n-placeholder="index.vtKeyPlaceholder" placeholder="VT API key for hash lookup">
+                        <div class="progress-text" data-i18n="index.vtKeyNote">Hash lookups run after each scan when key is set. Key is stored locally in this browser.</div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn" id="clear-btn" data-i18n="index.clearResults">Clear Results</button>
+                    <button class="btn" id="reset-btn" data-i18n="index.resetScanner">Reset Scanner</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card yara-card collapsed" id="yara-card">
+            <div class="yara-card-header" id="yara-card-toggle" role="button" tabindex="0" aria-expanded="false">
+                <span class="toggle">▼</span>
+                <h2 style="margin: 0;">YARA-like rules (optional)</h2>
+            </div>
+            <div class="yara-card-body">
+                <p class="progress-text" style="margin: 12px 0;" data-i18n="index.yaraDesc">Subset: <code>strings</code> with literal or hex, <code>condition: any of them</code>. Rules in the editor are applied automatically when you scan files; YARA results appear next to each sample. You can scan with YARA rules only (no ClamAV DB required).</p>
+                <textarea class="yara-editor" id="yara-editor" data-i18n-placeholder="index.yaraPlaceholder" placeholder="rule Example { strings: $a = \"hello\" condition: any of them }"></textarea>
+                <div class="actions" style="margin-top: 10px;">
+                    <button class="btn" id="yara-load-samples" data-i18n="index.loadSamples">Load sample rules</button>
+                    <button class="btn primary" id="yara-apply" data-i18n="index.applyRules">Apply rules</button>
+                    <button class="btn" id="yara-clear" data-i18n="index.clearYara">Clear YARA rules</button>
+                </div>
+                <div class="yara-status" id="yara-status" data-i18n="index.noYara">No YARA rules applied</div>
+                <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <h3 style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 8px;" data-i18n="index.runYaraOnSamples">Run YARA on scanned samples</h3>
+                    <p class="progress-text" style="margin-bottom: 8px;" data-i18n="index.runYaraDesc">YARA rules from the editor are run automatically on each file when you scan. Click below to re-run the current rules on the same scanned files (e.g. after editing rules).</p>
+                    <div class="actions" style="margin-top: 8px;">
+                        <button class="btn" id="yara-rerun-btn" data-i18n="index.runYaraOnSamples">Run YARA on scanned samples</button>
+                    </div>
+                    <div class="yara-status" id="yara-rerun-status" style="margin-top: 8px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="results-card">
+            <h2 data-i18n="index.scanResults">Scan Results</h2>
+            <div class="results-toolbar" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                <input type="text" class="results-search" id="results-search" data-i18n-placeholder="index.searchPlaceholder" placeholder="Search by filename, verdict, or threat…" style="margin-bottom: 0; flex: 1; min-width: 180px;">
+                <span class="results-search-count" id="results-search-count" style="font-size: 0.8rem; color: var(--text-dim); white-space: nowrap;"></span>
+                <button type="button" class="btn" id="rescan-all-btn" data-i18n="index.rescanAll">Rescan all samples</button>
+            </div>
+            <ul class="results-list" id="results-list">
+                <li class="empty-state" data-i18n="index.emptyResults">Scan results will appear here</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script type="module">
+        import init, { BrowserScanner } from './pkg/mimic_browser.js';
+
+        let scanner = null;
+        let totalSigs = 0;
+        let resultsCount = 0;
+        /** Last scanned files (name + data) for "Run YARA on scanned samples". */
+        let lastScannedFiles = [];
+
+        const SAMPLE_YARA_RULES = `rule SuspiciousExecutable {
+  strings:
+    $magic_elf = { 7f 45 4c 46 }
+    $magic_pe = "MZ"
+    $shell = "/bin/sh"
+    $nix_path = "/etc/passwd"
+  condition: any of them
+}
+
+rule SuspiciousStrings {
+  strings:
+    $a = "eval("
+    $b = "base64_decode"
+    $c = "cmd.exe"
+  condition: any of them
+}
+
+rule HelloWorld {
+  strings:
+    $hw = "Hello, World!"
+  condition: any of them
+}`;
+
+        const OSS_PROJECTS = [
+            { name: 'Mimic', url: 'https://github.com/IsMyPhonePwned/mimic', license: 'Apache-2.0', desc: 'This scanner (signatures, exploit detection, YARA-like rules).' },
+            { name: 'ClamAV', url: 'https://www.clamav.net/', license: 'GPL-2.0', desc: 'Signature format compatibility (CVD, HDB, NDB, LDB, etc.).' },
+            { name: 'Rust', url: 'https://www.rust-lang.org/', license: 'MIT / Apache-2.0', desc: 'Language and toolchain (compiled to WebAssembly).' },
+            { name: 'wasm-bindgen', url: 'https://github.com/rustwasm/wasm-bindgen', license: 'Apache-2.0 / MIT', desc: 'Rust ↔ JavaScript bindings for WASM.' },
+            { name: 'web-sys', url: 'https://rustwasm.github.io/wasm-bindgen/api/web_sys/', license: 'Apache-2.0 / MIT', desc: 'Rust bindings for Web APIs.' },
+            { name: 'serde', url: 'https://serde.rs/', license: 'MIT / Apache-2.0', desc: 'Serialization for Rust.' },
+            { name: 'sha2', url: 'https://github.com/RustCrypto/hashes', license: 'MIT / Apache-2.0', desc: 'SHA-256 hashing.' },
+            { name: 'md-5', url: 'https://github.com/RustCrypto/hashes', license: 'MIT / Apache-2.0', desc: 'MD5 hashing.' },
+            { name: 'hex', url: 'https://github.com/KokaKiwi/rust-hex', license: 'MIT / Apache-2.0', desc: 'Hex encoding/decoding.' },
+            { name: 'aho-corasick', url: 'https://github.com/BurntSushi/aho-corasick', license: 'MIT / Apache-2.0', desc: 'Multi-pattern matching (signature engine).' },
+            { name: 'flate2', url: 'https://github.com/rust-lang/flate2-rs', license: 'MIT / Apache-2.0', desc: 'CVD/CLD decompression.' },
+            { name: 'tar', url: 'https://github.com/alexcrichton/tar-rs', license: 'MIT / Apache-2.0', desc: 'Archive handling for ClamAV databases.' },
+            { name: 'JSZip', url: 'https://stuk.github.io/jszip/', license: 'MIT', desc: 'ZIP extraction in the browser (fetch & load ClamAV DB zip).' },
+        ];
+
+        const t = (key) => (window.MimicI18n && window.MimicI18n.t(key)) || key;
+
+        function renderOssList() {
+            const listEl = document.getElementById('oss-list');
+            if (!listEl) return;
+            listEl.innerHTML = OSS_PROJECTS.map(p => {
+                const namePart = p.url
+                    ? '<a href="' + escapeHtml(p.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(p.name) + '</a>'
+                    : escapeHtml(p.name);
+                return '<div class="oss-item"><span class="oss-name">' + namePart + '</span><span class="oss-license">' + escapeHtml(p.license) + '</span>' + (p.desc ? '<span class="oss-desc">' + escapeHtml(p.desc) + '</span>' : '') + '</div>';
+            }).join('');
+        }
+        function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+        async function main() {
+            if (window.MimicI18n) {
+                window.MimicI18n.applyTheme();
+                window.MimicI18n.applyTranslations();
+                const themeBtn = document.getElementById('theme-btn');
+                const langSelect = document.getElementById('lang-select');
+                if (themeBtn) {
+                    const updateThemeIcon = () => {
+                        themeBtn.textContent = window.MimicI18n.currentTheme === 'light' ? '☀️' : '🌙';
+                        themeBtn.setAttribute('title', window.MimicI18n.currentTheme === 'light' ? 'Switch to dark' : 'Switch to light');
+                    };
+                    updateThemeIcon();
+                    themeBtn.addEventListener('click', () => {
+                        window.MimicI18n.setTheme(window.MimicI18n.currentTheme === 'light' ? 'dark' : 'light');
+                        updateThemeIcon();
+                    });
+                }
+                if (langSelect) {
+                    langSelect.value = window.MimicI18n.currentLang;
+                    langSelect.addEventListener('change', () => window.MimicI18n.setLang(langSelect.value));
+                }
+            }
+
+            await init();
+            scanner = new BrowserScanner();
+
+            setupDrop('sig-drop', 'sig-input', handleSigFiles);
+            setupDrop('scan-drop', 'scan-input', handleScanFiles);
+
+            document.getElementById('clear-btn').addEventListener('click', clearResults);
+            document.getElementById('reset-btn').addEventListener('click', resetScanner);
+            document.getElementById('oneclick-btn').addEventListener('click', oneClickLoadClamAv);
+
+            document.getElementById('yara-load-samples').addEventListener('click', () => {
+                document.getElementById('yara-editor').value = SAMPLE_YARA_RULES;
+                document.getElementById('yara-status').textContent = t('index.sampleRulesLoaded');
+                document.getElementById('yara-status').className = 'yara-status';
+            });
+            document.getElementById('yara-apply').addEventListener('click', applyYaraRules);
+            document.getElementById('yara-clear').addEventListener('click', clearYaraRules);
+            document.getElementById('yara-rerun-btn').addEventListener('click', runYaraOnScannedSamples);
+
+            const yaraCard = document.getElementById('yara-card');
+            const yaraToggle = document.getElementById('yara-card-toggle');
+            yaraToggle.addEventListener('click', () => {
+                yaraCard.classList.toggle('collapsed');
+                yaraToggle.setAttribute('aria-expanded', yaraCard.classList.contains('collapsed') ? 'false' : 'true');
+            });
+            yaraToggle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); yaraToggle.click(); } });
+
+            document.getElementById('results-search').addEventListener('input', filterResults);
+            document.getElementById('rescan-all-btn').addEventListener('click', rescanAllSamples);
+
+            const vtInput = document.getElementById('vt-apikey');
+            if (vtInput) {
+                try {
+                    const saved = localStorage.getItem('mimic-browser-vt-key');
+                    if (saved) vtInput.value = saved;
+                } catch (_) {}
+                vtInput.addEventListener('blur', function () {
+                    try { localStorage.setItem('mimic-browser-vt-key', vtInput.value || ''); } catch (_) {}
+                });
+            }
+
+            renderOssList();
+            const ossBtn = document.getElementById('oss-summary-btn');
+            const ossModal = document.getElementById('oss-modal');
+            const ossCloseBtn = document.getElementById('oss-modal-close');
+            const ossContent = document.getElementById('oss-modal-content');
+            if (ossBtn && ossModal) {
+                ossBtn.addEventListener('click', () => { ossModal.classList.add('visible'); });
+                const closeOss = () => ossModal.classList.remove('visible');
+                if (ossCloseBtn) ossCloseBtn.addEventListener('click', closeOss);
+                ossModal.addEventListener('click', (e) => { if (e.target === ossModal) closeOss(); });
+                document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ossModal.classList.contains('visible')) closeOss(); });
+                if (ossContent) ossContent.addEventListener('click', (e) => e.stopPropagation());
+            }
+        }
+
+        function filterResults() {
+            const q = (document.getElementById('results-search').value || '').trim().toLowerCase();
+            const list = document.getElementById('results-list');
+            let total = 0;
+            let shown = 0;
+            list.querySelectorAll('li').forEach(li => {
+                if (li.classList.contains('empty-state')) return;
+                total++;
+                const show = !q || li.textContent.toLowerCase().includes(q);
+                li.style.display = show ? '' : 'none';
+                if (show) shown++;
+            });
+            const countEl = document.getElementById('results-search-count');
+            if (total === 0) {
+                countEl.textContent = '';
+            } else if (q) {
+                const matchKey = total === 1 ? 'index.match' : 'index.matches';
+                const ofStr = t('index.of');
+                countEl.textContent = shown === total ? total + ' ' + t(matchKey) : shown + ' ' + ofStr + ' ' + total + ' ' + t(matchKey);
+            } else {
+                countEl.textContent = total + ' ' + (total !== 1 ? t('index.files') : t('index.file'));
+            }
+        }
+
+        function applyYaraRules() {
+            const src = document.getElementById('yara-editor').value.trim();
+            const statusEl = document.getElementById('yara-status');
+            if (!src) {
+                statusEl.textContent = t('index.noRules');
+                statusEl.className = 'yara-status';
+                return;
+            }
+            const out = scanner.setYaraRules(src);
+            const json = JSON.parse(out);
+            if (json.error) {
+                statusEl.textContent = t('index.yaraError') + ' ' + json.error;
+                statusEl.className = 'yara-status error';
+            } else {
+                statusEl.textContent = json.rule_count + ' ' + t('index.rulesActive');
+                statusEl.className = 'yara-status ready';
+            }
+        }
+
+        function clearYaraRules() {
+            scanner.clearYaraRules();
+            document.getElementById('yara-status').textContent = t('index.noYara');
+            document.getElementById('yara-status').className = 'yara-status';
+        }
+
+        function runYaraOnScannedSamples() {
+            const statusEl = document.getElementById('yara-rerun-status');
+            if (!lastScannedFiles.length) {
+                statusEl.textContent = t('index.noScannedSamples');
+                statusEl.className = 'yara-status';
+                return;
+            }
+            const src = (document.getElementById('yara-editor').value || '').trim();
+            if (!src) {
+                statusEl.textContent = t('index.enterYaraRules');
+                statusEl.className = 'yara-status error';
+                return;
+            }
+            try {
+                const out = scanner.setYaraRules(src);
+                const json = JSON.parse(out);
+                if (json.error) {
+                    statusEl.textContent = t('index.yaraCompileError') + ' ' + json.error;
+                    statusEl.className = 'yara-status error';
+                    return;
+                }
+            } catch (e) {
+                statusEl.textContent = t('index.failedApplyRules') + ' ' + (e.message || e);
+                statusEl.className = 'yara-status error';
+                return;
+            }
+            const list = document.getElementById('results-list');
+            list.innerHTML = '';
+            resultsCount = 0;
+            const vtKey = (document.getElementById('vt-apikey').value || '').trim();
+            for (const { name, data } of lastScannedFiles) {
+                try {
+                    const resultJson = scanner.scanFile(name, data);
+                    const result = JSON.parse(resultJson);
+                    resultsCount++;
+                    const li = appendResult(list, result);
+                    if (vtKey && li) vtLookupAndUpdate(result.sha256, li, vtKey);
+                } catch (e) {
+                    console.error(`Failed to re-scan ${name}:`, e);
+                }
+            }
+            filterResults();
+            statusEl.textContent = t('index.rescanned') + ' ' + lastScannedFiles.length + ' ' + t('index.filesWithYara');
+            statusEl.className = 'yara-status ready';
+        }
+
+        function setupDrop(dropId, inputId, handler) {
+            const zone = document.getElementById(dropId);
+            const input = document.getElementById(inputId);
+
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('active'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('active'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('active');
+                handler(e.dataTransfer.files);
+            });
+            input.addEventListener('change', () => handler(input.files));
+        }
+
+        // One-click loads from same-origin data/ or from GitHub (zip stored as LFS).
+        const CLAMAV_ZIP_NAME = 'clamav-db.zip';
+        /** Fallback: zip in repo 42bzh/69bzh.github.io, av/data/clamav-db.zip (Git LFS). */
+        const CLAMAV_ZIP_GITHUB_RAW = 'https://raw.githubusercontent.com/42bzh/69bzh.github.io/main/av/data/clamav-db.zip';
+        const SIG_EXTENSIONS = new Set(['.cvd', '.cld', '.hdb', '.hsb', '.ndb', '.ldb', '.ldu', '.mdb', '.msb', '.fp', '.sfp', '.cdb', '.cbc']);
+        const CORS_PROXY = 'https://corsproxy.io/?';
+
+        /** URLs to try for clamav-db.zip: same-origin data/, then relative data/, then GitHub raw. */
+        function getDataZipUrls() {
+            const urls = [];
+            if (window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file:')) {
+                urls.push(`${window.location.origin}/data/${CLAMAV_ZIP_NAME}`);
+            }
+            try {
+                urls.push(new URL(CLAMAV_ZIP_NAME, new URL('data/', window.location.href)).href);
+            } catch (_) {}
+            urls.push(CLAMAV_ZIP_GITHUB_RAW);
+            return urls;
+        }
+
+        function hasSigExtension(name) {
+            const i = name.lastIndexOf('.');
+            return i >= 0 && SIG_EXTENSIONS.has(name.slice(i).toLowerCase());
+        }
+
+        /** Parse Git LFS pointer (version, oid, size); returns { oid, size } or null. */
+        function parseLfsPointer(text) {
+            if (!text || typeof text !== 'string') return null;
+            const lines = text.trim().split(/\r?\n/);
+            if (lines.length < 3) return null;
+            const version = lines[0];
+            if (!version.startsWith('version https://git-lfs.github.com/spec/v1')) return null;
+            let oid = null, size = null;
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].startsWith('oid ')) oid = lines[i].slice(4).trim();
+                else if (lines[i].startsWith('size ')) size = parseInt(lines[i].slice(5).trim(), 10);
+            }
+            if (oid && !isNaN(size) && size > 0) return { oid, size };
+            return null;
+        }
+
+        /** Resolve GitHub LFS pointer via Batch API; returns blob of actual file. See https://github.com/git-lfs/git-lfs/blob/main/docs/api/batch.md */
+        async function resolveGitHubLfs(rawUrl, pointerBlob, onProgress) {
+            const text = await pointerBlob.text();
+            const parsed = parseLfsPointer(text);
+            if (!parsed) throw new Error('Invalid LFS pointer');
+            const m = rawUrl.match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\//);
+            if (!m) throw new Error('Could not derive repo from URL');
+            const [, owner, repo] = m;
+            const batchUrl = `https://github.com/${owner}/${repo}.git/info/lfs/objects/batch`;
+            const headers = { 'Accept': 'application/vnd.git-lfs+json', 'Content-Type': 'application/vnd.git-lfs+json' };
+            const oidVariants = [parsed.oid];
+            if (parsed.oid.startsWith('sha256:')) oidVariants.push(parsed.oid.slice(7));
+            else oidVariants.push('sha256:' + parsed.oid);
+            let batchRes = null;
+            let batchJson = null;
+            for (const oid of oidVariants) {
+                const batchBody = JSON.stringify({
+                    operation: 'download',
+                    objects: [{ oid: oid, size: parsed.size }]
+                });
+                const tryFetch = (url) => fetch(url, { method: 'POST', mode: 'cors', headers, body: batchBody });
+                try {
+                    batchRes = await tryFetch(batchUrl);
+                } catch (_) {
+                    try {
+                        batchRes = await tryFetch(CORS_PROXY + encodeURIComponent(batchUrl));
+                    } catch (_) {
+                        continue;
+                    }
+                }
+                if (!batchRes.ok) continue;
+                batchJson = await batchRes.json();
+                const obj0 = batchJson.objects && batchJson.objects[0];
+                if (obj0 && !obj0.error && obj0.actions && obj0.actions.download) break;
+                batchJson = null;
+            }
+            if (!batchJson) throw new Error('LFS batch failed or object not found. Try: git lfs push --all origin');
+            const obj = batchJson.objects && batchJson.objects[0];
+            if (!obj || obj.error) {
+                const msg = obj && obj.error && obj.error.message;
+                const code = obj && obj.error && obj.error.code;
+                if (code === 404 || (msg && msg.toLowerCase().includes('does not exist'))) {
+                    throw new Error('Git LFS object not found. Ensure you ran: git lfs push --all origin (and wait 1–2 min). Or use same-origin data/clamav-db.zip or drop a zip.');
+                }
+                throw new Error(msg || 'LFS batch returned no download');
+            }
+            const downloadAction = obj.actions && obj.actions.download;
+            if (!downloadAction || !downloadAction.href) throw new Error('LFS batch: no download href');
+            const downloadUrl = downloadAction.href;
+            let downloadRes;
+            try {
+                downloadRes = await fetch(downloadUrl, { mode: 'cors', referrerPolicy: 'no-referrer' });
+            } catch (e) {
+                const msg = (e && e.message) || String(e);
+                if (/failed to fetch|networkerror|cors/i.test(msg)) {
+                    throw new Error('LFS download blocked (CORS/network). Use same-origin data/clamav-db.zip (run scripts/zip-data.sh and serve from that host) or drop a zip file here.');
+                }
+                throw e;
+            }
+            if (!downloadRes.ok) {
+                throw new Error('LFS download failed (' + downloadRes.status + '). Use same-origin data/clamav-db.zip or drop a zip file here.');
+            }
+            const total = downloadRes.headers.get('Content-Length');
+            const totalBytes = total ? parseInt(total, 10) : null;
+            const reader = downloadRes.body.getReader();
+            const chunks = [];
+            let received = 0;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                received += value.length;
+                if (onProgress) onProgress(received, totalBytes || parsed.size);
+            }
+            const blob = new Blob(chunks);
+            return blob;
+        }
+
+        /** Fetch a zip from url, extract entries with signature extensions; returns [{ name, data }]. Resolves Git LFS pointer when needed. */
+        async function fetchZipAndExtract(url, onProgress) {
+            const res = await fetch(url, { mode: 'cors', referrerPolicy: 'no-referrer' });
+            if (!res.ok) throw new Error(res.status);
+            const total = res.headers.get('Content-Length');
+            const totalBytes = total ? parseInt(total, 10) : null;
+            const reader = res.body.getReader();
+            const chunks = [];
+            let received = 0;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                received += value.length;
+                if (onProgress) onProgress(received, totalBytes);
+            }
+            let blob = new Blob(chunks);
+            if (blob.size < 256 && url.includes('raw.githubusercontent.com')) {
+                const text = await blob.slice(0, 200).text();
+                if (parseLfsPointer(text)) {
+                    blob = await resolveGitHubLfs(url, blob, onProgress);
+                }
+            }
+            if (typeof JSZip === 'undefined') throw new Error('JSZip not loaded');
+            const zip = await JSZip.loadAsync(blob);
+            const entries = [];
+            for (const [path, entry] of Object.entries(zip.files)) {
+                if (entry.dir) continue;
+                const name = path.split('/').pop() || path;
+                if (!hasSigExtension(name)) continue;
+                const ab = await entry.async('arraybuffer');
+                entries.push({ name, data: new Uint8Array(ab) });
+            }
+            return entries;
+        }
+
+        async function oneClickLoadClamAv() {
+            const btn = document.getElementById('oneclick-btn');
+            const progressWrap = document.getElementById('oneclick-progress');
+            const fill = document.getElementById('oneclick-fill');
+            const textEl = document.getElementById('oneclick-text');
+            const errorEl = document.getElementById('oneclick-error');
+            const statusBar = document.getElementById('sig-status');
+
+            btn.disabled = true;
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+            progressWrap.classList.add('active');
+
+            try {
+                const zipUrls = getDataZipUrls();
+                if (zipUrls.length === 0) {
+                    throw new Error('No data/ URL available (open the app from a server, not file://)');
+                }
+                let zipLoaded = false;
+                let lastErr = null;
+                for (const url of zipUrls) {
+                    try {
+                        statusBar.innerHTML = '<div class="dot loading"></div><span>' + t('index.downloading') + ' ' + CLAMAV_ZIP_NAME + '…</span>';
+                        const entries = await fetchZipAndExtract(url, (received, totalBytes) => {
+                            if (totalBytes != null && totalBytes > 0) {
+                                const pct = Math.min(100, Math.round((received / totalBytes) * 100));
+                                fill.style.width = pct + '%';
+                                textEl.textContent = CLAMAV_ZIP_NAME + ': ' + formatSize(received) + ' / ' + formatSize(totalBytes) + ' (' + pct + '%)';
+                            } else {
+                                textEl.textContent = CLAMAV_ZIP_NAME + ': ' + formatSize(received);
+                            }
+                        });
+                        if (entries.length === 0) { lastErr = new Error('No signature files in zip'); continue; }
+                        zipLoaded = true;
+                        for (const entry of entries) {
+                            statusBar.innerHTML = '<div class="dot loading"></div><span>' + t('index.loading') + ' ' + entry.name + '…</span>';
+                            textEl.textContent = t('index.loading') + ' ' + entry.name + '…';
+                            fill.style.width = '100%';
+                            await new Promise(r => setTimeout(r, 5));
+                            const statsJson = scanner.loadDatabase(entry.name, entry.data);
+                            const stats = JSON.parse(statsJson);
+                            totalSigs = stats.total;
+                            updateStats(stats);
+                        }
+                        break;
+                    } catch (e) {
+                        lastErr = e;
+                        continue;
+                    }
+                }
+                if (!zipLoaded) {
+                    throw lastErr || new Error('Could not load ' + CLAMAV_ZIP_NAME + ' from data/');
+                }
+
+                textEl.textContent = t('index.buildAutomata');
+                statusBar.innerHTML = '<div class="dot loading"></div><span>' + t('index.buildAutomata') + '</span>';
+                await new Promise(r => setTimeout(r, 10));
+                scanner.finalize();
+
+                progressWrap.classList.remove('active');
+                statusBar.innerHTML = '<div class="dot ready"></div><span>' + totalSigs.toLocaleString() + ' ' + t('index.sigsReady') + '</span>';
+            } catch (e) {
+                progressWrap.classList.remove('active');
+                errorEl.style.display = 'block';
+                let errMsg = e.message || String(e);
+                if (/failed to fetch|networkerror|cors/i.test(errMsg) && !/same-origin|drop a zip/i.test(errMsg)) {
+                    errMsg = 'Download blocked (CORS/network). Use same-origin data/clamav-db.zip (run scripts/zip-data.sh and serve from that host) or drop a zip file here.';
+                }
+                errorEl.textContent = errMsg;
+                statusBar.innerHTML = '<div class="dot"></div><span>' + t('index.downloadFailed') + '</span>';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        /** Extract signature files from a zip File; returns [{ name, data }]. */
+        async function extractSigEntriesFromZip(file) {
+            if (typeof JSZip === 'undefined') throw new Error('JSZip not loaded');
+            const blob = new Blob([await file.arrayBuffer()]);
+            const zip = await JSZip.loadAsync(blob);
+            const entries = [];
+            for (const [path, entry] of Object.entries(zip.files)) {
+                if (entry.dir) continue;
+                const name = path.split('/').pop() || path;
+                if (!hasSigExtension(name)) continue;
+                const ab = await entry.async('arraybuffer');
+                entries.push({ name, data: new Uint8Array(ab) });
+            }
+            return entries;
+        }
+
+        async function handleSigFiles(files) {
+            const statusBar = document.getElementById('sig-status');
+            statusBar.innerHTML = '<div class="dot loading"></div><span>' + t('index.loading') + ' signatures...</span>';
+
+            const toLoad = [];
+            for (const file of files) {
+                const name = (file.name || '').toLowerCase();
+                if (name.endsWith('.zip')) {
+                    try {
+                        const entries = await extractSigEntriesFromZip(file);
+                        toLoad.push(...entries);
+                    } catch (e) {
+                        console.error('Failed to extract zip ' + file.name + ':', e);
+                    }
+                } else {
+                    const data = new Uint8Array(await file.arrayBuffer());
+                    toLoad.push({ name: file.name, data });
+                }
+            }
+            for (const { name, data } of toLoad) {
+                try {
+                    const statsJson = scanner.loadDatabase(name, data);
+                    const stats = JSON.parse(statsJson);
+                    totalSigs = stats.total;
+                    updateStats(stats);
+                } catch (e) {
+                    console.error('Failed to load ' + name + ':', e);
+                }
+            }
+
+            statusBar.innerHTML = '<div class="dot loading"></div><span>' + t('index.buildAutomata') + '</span>';
+
+            await new Promise(r => setTimeout(r, 10));
+            scanner.finalize();
+
+            statusBar.innerHTML = '<div class="dot ready"></div><span>' + totalSigs.toLocaleString() + ' ' + t('index.sigsReady') + '</span>';
+        }
+
+        function updateStats(stats) {
+            const grid = document.getElementById('stats-grid');
+            grid.style.display = 'grid';
+            grid.innerHTML = [
+                ['MD5', stats.md5_sigs],
+                ['SHA256', stats.sha256_sigs],
+                ['MDB', stats.mdb_sigs],
+                ['NDB', stats.ndb_fixed + stats.ndb_wildcard],
+                ['LDB', stats.ldb_sigs],
+                ['CDB', stats.cdb_sigs],
+                ['FP', stats.fp_sigs],
+                ['Total', stats.total],
+            ].map(([label, value]) => `
+                <div class="stat">
+                    <div class="value">${value.toLocaleString()}</div>
+                    <div class="label">${label}</div>
+                </div>
+            `).join('');
+        }
+
+        async function handleScanFiles(files) {
+            const yaraEditorContent = (document.getElementById('yara-editor').value || '').trim();
+            if (yaraEditorContent && scanner && typeof scanner.setYaraRules === 'function') {
+                try {
+                    const out = scanner.setYaraRules(yaraEditorContent);
+                    const json = JSON.parse(out);
+                    if (json.error) {
+                        document.getElementById('yara-status').textContent = 'YARA: ' + json.error;
+                        document.getElementById('yara-status').className = 'yara-status error';
+                    } else {
+                        document.getElementById('yara-status').textContent = json.rule_count + ' YARA rule(s) used for this scan.';
+                        document.getElementById('yara-status').className = 'yara-status ready';
+                    }
+                } catch (e) {
+                    console.warn('YARA apply failed:', e);
+                }
+            }
+            const yaraCount = scanner ? scanner.getYaraRuleCount() : 0;
+            const mimicDetectOnly = document.getElementById('mimic-detect-only') && document.getElementById('mimic-detect-only').checked;
+            if (!mimicDetectOnly && totalSigs === 0 && yaraCount === 0) {
+                alert('Load ClamAV signature databases and/or add YARA rules in the editor first, or enable "mimic-detect only" above.');
+                return;
+            }
+
+            const list = document.getElementById('results-list');
+            if (resultsCount === 0) list.innerHTML = '';
+            const vtKey = (document.getElementById('vt-apikey').value || '').trim();
+            try { if (vtKey) localStorage.setItem('mimic-browser-vt-key', vtKey); } catch (_) {}
+
+            lastScannedFiles = [];
+            for (const file of files) {
+                const data = new Uint8Array(await file.arrayBuffer());
+                lastScannedFiles.push({ name: file.name, data });
+                try {
+                    const resultJson = scanner.scanFile(file.name, data);
+                    const result = JSON.parse(resultJson);
+                    resultsCount++;
+                    const li = appendResult(list, result);
+                    if (vtKey && li) vtLookupAndUpdate(result.sha256, li, vtKey);
+                } catch (e) {
+                    console.error(`Failed to scan ${file.name}:`, e);
+                }
+            }
+            filterResults();
+        }
+
+        function rescanAllSamples() {
+            const yaraEditorContent = (document.getElementById('yara-editor').value || '').trim();
+            if (yaraEditorContent && scanner && typeof scanner.setYaraRules === 'function') {
+                try {
+                    const out = scanner.setYaraRules(yaraEditorContent);
+                    const json = JSON.parse(out);
+                    if (!json.error) {
+                        document.getElementById('yara-status').textContent = json.rule_count + ' YARA rule(s) used for this scan.';
+                        document.getElementById('yara-status').className = 'yara-status ready';
+                    }
+                } catch (_) {}
+            }
+            const yaraCount = scanner ? scanner.getYaraRuleCount() : 0;
+            const mimicDetectOnly = document.getElementById('mimic-detect-only') && document.getElementById('mimic-detect-only').checked;
+            if (!mimicDetectOnly && totalSigs === 0 && yaraCount === 0) {
+                alert('Load ClamAV signature databases and/or add YARA rules in the editor first, or enable "mimic-detect only" above.');
+                return;
+            }
+            if (!lastScannedFiles.length) {
+                alert('No samples to rescan. Scan files first.');
+                return;
+            }
+            const list = document.getElementById('results-list');
+            list.innerHTML = '';
+            resultsCount = 0;
+            const vtKey = (document.getElementById('vt-apikey').value || '').trim();
+            for (const { name, data } of lastScannedFiles) {
+                try {
+                    const resultJson = scanner.scanFile(name, data);
+                    const result = JSON.parse(resultJson);
+                    resultsCount++;
+                    const li = appendResult(list, result);
+                    if (vtKey && li) vtLookupAndUpdate(result.sha256, li, vtKey);
+                } catch (e) {
+                    console.error(`Failed to rescan ${name}:`, e);
+                }
+            }
+            filterResults();
+        }
+
+        function blockHtml(className, label, names) {
+            const hasContent = names && names.length > 0;
+            const content = hasContent ? escHtml(names.join(', ')) : '—';
+            const emptyClass = hasContent ? '' : ' empty';
+            return `<div class="result-block ${className}"><span class="block-label">${escHtml(label)}</span><div class="block-content${emptyClass}">${content}</div></div>`;
+        }
+
+        function buildWhyMatchHtml(threats) {
+            const withWhy = (threats || []).filter(t => t.why);
+            if (withWhy.length === 0) return '';
+            const items = withWhy.map(t => `<div class="why-item"><div class="why-name">${escHtml(t.name)}</div><div class="why-reason">${escHtml(t.why)}</div></div>`).join('');
+            return `<div class="why-match-wrap">
+                <button type="button" class="why-match-btn" data-why-toggle>${t('index.whyDidItMatch')}</button>
+                <div class="why-match-panel" data-why-panel>${items}</div>
+            </div>`;
+        }
+
+        function appendResult(list, result) {
+            const li = document.createElement('li');
+            li.dataset.sha256 = result.sha256 || '';
+            li.dataset.filename = result.filename || '';
+            const isInfected = result.verdict === 'INFECTED';
+            const threats = result.threats || [];
+            const clamavThreats = threats.filter(x => x.sig_type !== 'mimic-detect' && x.sig_type !== 'yara');
+            const mimicThreats = threats.filter(x => x.sig_type === 'mimic-detect');
+            const yaraThreats = threats.filter(x => x.sig_type === 'yara');
+
+            const threatsContent = [
+                blockHtml('clamav', t('index.clamav'), clamavThreats.map(x => x.name)),
+                blockHtml('mimic', t('index.mimic'), mimicThreats.map(x => x.name)),
+                blockHtml('yara', t('index.yara'), yaraThreats.map(x => x.name)),
+            ].join('');
+            const whyHtml = buildWhyMatchHtml(threats);
+
+            li.innerHTML = `
+                <span class="verdict ${isInfected ? 'infected' : 'clean'}">${result.verdict}</span>
+                <div class="file-info">
+                    <div class="name">${escHtml(result.filename)}</div>
+                    <div class="meta">${formatSize(result.size)} &middot; MD5: ${result.md5.slice(0,12)}&hellip; <span class="vt-badge" data-vt="">—</span></div>
+                </div>
+                <div class="threat-names">${threatsContent}${whyHtml}</div>
+                <button type="button" class="inspect-btn" title="Open in hex inspector">${t('index.inspect')}</button>
+            `;
+            li.querySelector('.inspect-btn').addEventListener('click', () => openInspector(result.filename));
+            const whyToggle = li.querySelector('[data-why-toggle]');
+            const whyPanel = li.querySelector('[data-why-panel]');
+            if (whyToggle && whyPanel) {
+                whyToggle.addEventListener('click', () => whyPanel.classList.toggle('visible'));
+            }
+            list.prepend(li);
+            return li;
+        }
+
+        function openInspector(filename) {
+            const entry = lastScannedFiles.find(f => f.name === filename);
+            if (!entry) { alert('File data not available. Rescan to enable inspection.'); return; }
+            const win = window.open('inspect.html', '_blank');
+            if (!win) { alert('Popup blocked. Allow popups for this site.'); return; }
+            const trySend = () => {
+                try { win.postMessage({ type: 'inspect-file', name: entry.name, data: entry.data.buffer }, '*'); }
+                catch (_) { setTimeout(trySend, 100); }
+            };
+            win.addEventListener('load', trySend);
+            setTimeout(trySend, 500);
+        }
+
+        async function vtLookupAndUpdate(sha256, li, apiKey) {
+            const badge = li.querySelector('.vt-badge[data-vt]');
+            if (!badge) return;
+            badge.textContent = 'VT…';
+            try {
+                const res = await fetch(`https://www.virustotal.com/api/v3/files/${sha256}`, {
+                    headers: { 'x-apikey': apiKey },
+                    referrerPolicy: 'no-referrer'
+                });
+                if (res.status === 404) {
+                    badge.textContent = 'VT: not found';
+                    return;
+                }
+                if (!res.ok) {
+                    badge.textContent = 'VT: error';
+                    return;
+                }
+                const json = await res.json();
+                const attrs = json.data?.attributes || {};
+                const stats = attrs.last_analysis_stats || {};
+                const mal = stats.malicious ?? 0;
+                const total = (stats.harmless ?? 0) + (stats.suspicious ?? 0) + mal + (stats.undetected ?? 0);
+                const guiLink = `https://www.virustotal.com/gui/file/${sha256}`;
+                if (total > 0) {
+                    badge.classList.add('found');
+                    badge.innerHTML = `VT: ${mal}/${total} <a href="${escHtml(guiLink)}" target="_blank" rel="noopener">view</a>`;
+                } else {
+                    badge.textContent = 'VT: —';
+                }
+            } catch (_) {
+                badge.textContent = 'VT: —';
+            }
+        }
+
+        function clearResults() {
+            resultsCount = 0;
+            lastScannedFiles = [];
+            document.getElementById('results-list').innerHTML = '<li class="empty-state" data-i18n="index.emptyResults">' + t('index.emptyResults') + '</li>';
+            document.getElementById('results-search').value = '';
+            document.getElementById('yara-rerun-status').textContent = '';
+        }
+
+        function resetScanner() {
+            scanner.reset();
+            totalSigs = 0;
+            resultsCount = 0;
+            lastScannedFiles = [];
+            document.getElementById('stats-grid').style.display = 'none';
+            document.getElementById('sig-status').innerHTML = '<div class="dot"></div><span data-i18n="index.noSignatures">' + t('index.noSignatures') + '</span>';
+            document.getElementById('oneclick-error').style.display = 'none';
+            document.getElementById('oneclick-error').textContent = '';
+            clearYaraRules();
+            document.getElementById('yara-rerun-status').textContent = '';
+            clearResults();
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KiB';
+            return (bytes / 1048576).toFixed(1) + ' MiB';
+        }
+
+        function escHtml(s) {
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        main().catch(console.error);
+    </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+[package]
+name = "mimic-view"
+description = "File format inspector for RTF, PDF, DNG/TIFF — WASM-ready structure parser and hex view backend"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+serde = { workspace = true }
+serde_json = { workspace = true }

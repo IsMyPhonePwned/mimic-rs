@@ -1,0 +1,38 @@
+[package]
+name = "mimic-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "MCP server for Mimic: expose scan_file and scan_bytes tools to LLMs"
+
+[features]
+default = []
+# Expose MCP over HTTP (Streamable HTTP transport) so clients can connect via API.
+http = ["rmcp/transport-streamable-http-server", "dep:axum", "dep:tokio-util"]
+# HTTPS (TLS) for HTTP mode. Requires http. Auto-generates a self-signed cert if --tls-cert/--tls-key omitted.
+https = ["http", "dep:axum-server", "dep:rcgen"]
+
+[dependencies]
+mimic-core = { path = "../mimic-core" }
+mimic-engine = { path = "../mimic-engine" }
+rmcp = { version = "1", features = ["server", "transport-io"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "net"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive", "env"] }
+base64 = "0.22"
+walkdir = "2"
+
+# Optional deps for HTTP transport (enable with --features http)
+axum = { version = "0.7", optional = true }
+tokio-util = { version = "0.7", optional = true }
+# Optional TLS for HTTP mode (enable with --features https)
+axum-server = { version = "0.7", features = ["tls-rustls"], optional = true }
+rcgen = { version = "0.12", optional = true }
+
+[[bin]]
+name = "mimic-mcp"
+path = "src/main.rs"
+required-features = []

@@ -1,0 +1,22 @@
+[package]
+name = "mimic-detect"
+description = "Detect maliciously crafted files that exploit parsing vulnerabilities (DNG, RTF, TTF, RAR, PDF)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "mimic_detect"
+path = "src/lib.rs"
+# cdylib so that --target wasm32-unknown-unknown produces a loadable .wasm plugin
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["serde"]
+serde = []
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# No extra deps for wasm; std is available

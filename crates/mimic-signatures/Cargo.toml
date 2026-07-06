@@ -1,0 +1,23 @@
+[package]
+name = "mimic-signatures"
+description = "ClamAV signature database loader and high-speed pattern matcher"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["native"]
+native = ["rayon", "indicatif"]
+
+[dependencies]
+mimic-core = { workspace = true }
+aho-corasick = { workspace = true }
+sha2 = { workspace = true }
+md-5 = { workspace = true }
+hex = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+indicatif = { workspace = true, optional = true }
+rayon = { workspace = true, optional = true }

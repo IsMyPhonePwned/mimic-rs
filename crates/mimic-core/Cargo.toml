@@ -1,0 +1,11 @@
+[package]
+name = "mimic-core"
+description = "Core types, traits, and verdict system for Mimic AV engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

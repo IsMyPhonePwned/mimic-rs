@@ -1,0 +1,29 @@
+[package]
+name = "mimic-browser"
+description = "In-browser file scanner powered by Mimic signature engine (WASM)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+mimic-signatures = { path = "../mimic-signatures", default-features = false }
+mimic-core = { workspace = true }
+mimic-detect = { path = "../mimic-detect" }
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+    "console",
+    "File",
+    "FileList",
+    "FileReader",
+    "HtmlInputElement",
+    "Blob",
+] }
+js-sys = "0.3"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+md-5 = { workspace = true }
+hex = { workspace = true }

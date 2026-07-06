@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="logo.png" type="image/png">
+    <script src="i18n.js"></script>
+    <script>if (window.MimicI18n) window.MimicI18n.applyTheme();</script>
+    <title>Mimic — File Inspector</title>
+    <style>
+        :root, .theme-dark {
+            --bg: #0f1117; --surface: #1a1d27; --surface2: #242836; --border: #2e3347;
+            --text: #e1e4ed; --text-dim: #8b90a5; --accent: #6c8cff; --accent-dim: #4a5f99;
+            --green: #4ade80; --red: #f87171; --orange: #fbbf24; --purple: #c084fc; --cyan: #22d3ee;
+            --radius: 12px;
+        }
+        .theme-light {
+            --bg: #f4f5f8; --surface: #fff; --surface2: #e8eaef; --border: #d0d4dc;
+            --text: #1a1d27; --text-dim: #5c6178; --accent: #4a6cf7; --accent-dim: #3d5dd9;
+            --green: #16a34a; --red: #dc2626; --orange: #d97706; --purple: #9333ea; --cyan: #0891b2;
+        }
+        .theme-light .search-panel-header:hover { background: rgba(0,0,0,0.06); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5;
+            display: flex; flex-direction: column;
+        }
+        a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+        .container {
+            width: 100%;
+            max-width: min(1760px, 100%);
+            margin: 0 auto;
+            padding: 10px clamp(10px, 1.5vw, 24px) 16px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #app-content { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        header .logo { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; }
+        header h1 { font-size: 1.2rem; font-weight: 700; }
+        header .badge { font-size: 0.65rem; background: var(--purple); color: #fff; padding: 2px 8px; border-radius: 999px; font-weight: 600; text-transform: uppercase; }
+        header .header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        header .theme-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; color: var(--text-dim); }
+        header .theme-btn:hover { background: var(--border); color: var(--text); }
+        header .lang-select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 0.78rem; color: var(--text); cursor: pointer; min-width: 90px; }
+        header .back { font-size: 0.85rem; }
+        .drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 14px 14px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; margin-bottom: 10px; flex-shrink: 0; }
+        .drop-zone:hover, .drop-zone.active { border-color: var(--accent); background: rgba(108,140,255,0.05); }
+        .drop-zone p { color: var(--text-dim); font-size: 0.85rem; }
+        .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-dim); flex-wrap: wrap; flex-shrink: 0; }
+        .toolbar strong { color: var(--text); }
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr minmax(300px, 34vw);
+            gap: 12px;
+            flex: 1;
+            min-height: 0;
+            align-content: stretch;
+        }
+        @media (max-width: 1100px) { .main-grid { grid-template-columns: 1fr minmax(260px, 38%); } }
+        @media (max-width: 960px) { .main-grid { grid-template-columns: 1fr; flex: 1; min-height: min(70vh, 900px); } }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+        .card h2 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 10px; }
+        .main-grid > .card { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+        .main-grid > .card > h2 { flex-shrink: 0; }
+        .hex-container { overflow: auto; flex: 1; min-height: 200px; max-height: calc(100vh - 200px); }
+        .hex-table { font-family: ui-monospace,'Cascadia Code','Source Code Pro',Menlo,monospace; font-size: 0.78rem; line-height: 1.5; border-collapse: collapse; width: 100%; }
+        .hex-table .offset { color: var(--text-dim); padding-right: 14px; user-select: none; white-space: nowrap; text-align: right; width: 76px; }
+        .hex-table .hc { padding: 0 2px; cursor: pointer; border-radius: 2px; user-select: none; }
+        .hex-table .hc:hover { background: rgba(108,140,255,0.2); }
+        .hex-table .hc.sel { background: var(--accent); color: #fff; }
+        .hex-table .hs { width: 10px; }
+        .hex-table .ac { color: var(--text-dim); white-space: pre; padding-left: 14px; user-select: none; }
+        .hex-table .as { padding: 0 1px; cursor: pointer; border-radius: 2px; user-select: none; }
+        .hex-table .as:hover { background: rgba(108,140,255,0.2); }
+        .hex-table .as.sel { background: var(--accent); color: #fff; }
+        .hl-header   { background: rgba(248,113,113,0.18) !important; color: var(--red) !important; }
+        .hl-control  { background: rgba(108,140,255,0.14) !important; color: var(--accent) !important; }
+        .hl-object   { background: rgba(192,132,252,0.14) !important; color: var(--purple) !important; }
+        .hl-data     { background: rgba(251,191,36,0.18) !important; color: var(--orange) !important; }
+        .hl-ole      { background: rgba(34,211,238,0.18) !important; color: var(--cyan) !important; }
+        .hl-text     { background: rgba(74,222,128,0.08) !important; }
+        .hl-warning  { background: rgba(248,113,113,0.25) !important; color: var(--red) !important; }
+        .hl-stream   { background: rgba(74,222,128,0.14) !important; color: var(--green) !important; }
+        .hl-xref     { background: rgba(192,132,252,0.14) !important; color: var(--purple) !important; }
+        .hl-ifd      { background: rgba(108,140,255,0.14) !important; color: var(--accent) !important; }
+        .hl-tile     { background: rgba(251,191,36,0.14) !important; color: var(--orange) !important; }
+        .hl-jpeg     { background: rgba(34,211,238,0.14) !important; color: var(--cyan) !important; }
+        .structure-panel { flex: 1; min-height: 200px; max-height: calc(100vh - 200px); overflow-y: auto; overflow-x: hidden; }
+        .sn { border-left: 2px solid var(--border); margin-bottom: 4px; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; transition: background 0.15s; }
+        .sn:hover { background: var(--surface2); }
+        .sn.active { background: var(--surface2); border-left-color: var(--accent); }
+        .sn .nl { font-weight: 600; word-break: break-word; }
+        .sn .nd { color: var(--text-dim); font-size: 0.74rem; margin-top: 3px; line-height: 1.4; word-break: break-word; white-space: pre-wrap; }
+        .sn .no { font-family: ui-monospace,monospace; font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+        .sn.t-header  { border-left-color: var(--red); }
+        .sn.t-control { border-left-color: var(--accent); }
+        .sn.t-object  { border-left-color: var(--purple); }
+        .sn.t-data    { border-left-color: var(--orange); }
+        .sn.t-ole     { border-left-color: var(--cyan); }
+        .sn.t-text    { border-left-color: var(--green); }
+        .sn.t-warning { border-left-color: var(--red); background: rgba(248,113,113,0.06); }
+        .sn.t-stream  { border-left-color: var(--green); }
+        .sn.t-xref    { border-left-color: var(--purple); }
+        .sn.t-ifd     { border-left-color: var(--accent); }
+        .sn.t-tile    { border-left-color: var(--orange); }
+        .sn.t-jpeg    { border-left-color: var(--cyan); }
+        .sn.t-section { border-left-color: var(--purple); }
+        .sn.t-phdr    { border-left-color: var(--accent); }
+        .sn.t-file    { border-left-color: var(--green); }
+        .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; font-size: 0.7rem; flex-shrink: 0; }
+        .legend span { display: flex; align-items: center; gap: 4px; }
+        .legend .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+        .loading-msg { text-align: center; padding: 40px; color: var(--text-dim); }
+
+        /* ─── Search panel (docked, collapsible) ─── */
+        .search-panel { display: none; margin-bottom: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; flex-shrink: 0; }
+        .search-panel.visible { display: block; }
+        .search-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--surface2); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+        .search-panel-header:hover { background: #2a2e3d; }
+        .search-panel-title { font-size: 0.8rem; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+        .search-panel-title kbd { font-family: ui-monospace, monospace; font-size: 0.7rem; padding: 2px 5px; border-radius: 4px; background: var(--bg); color: var(--text-dim); border: 1px solid var(--border); }
+        .search-panel-close { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 1rem; line-height: 1; }
+        .search-panel-close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+        .search-panel-body { padding: 12px 14px; }
+        .search-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .search-modes { display: flex; gap: 2px; background: var(--bg); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
+        .search-mode-btn { background: transparent; color: var(--text-dim); border: none; padding: 5px 12px; font-size: 0.75rem; font-weight: 500; border-radius: 6px; cursor: pointer; transition: background 0.15s, color 0.15s; }
+        .search-mode-btn:hover { color: var(--text); background: var(--surface2); }
+        .search-mode-btn.active { background: var(--accent); color: #fff; }
+        .search-input-wrap { position: relative; flex: 1; min-width: 220px; max-width: 480px; }
+        .search-input { width: 100%; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px 8px 12px; font-size: 0.85rem; font-family: ui-monospace,'Cascadia Code','Source Code Pro',Menlo,monospace; outline: none; box-sizing: border-box; }
+        .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,0.2); }
+        .search-input.error { border-color: var(--red); }
+        .search-input::placeholder { color: var(--text-dim); }
+        .search-history { position: absolute; top: 100%; left: 0; right: 0; margin-top: 2px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: none; }
+        .search-history.visible { display: block; }
+        .search-history-item { padding: 6px 12px; font-size: 0.8rem; font-family: ui-monospace, monospace; cursor: pointer; border-bottom: 1px solid var(--border); color: var(--text); }
+        .search-history-item:last-child { border-bottom: none; }
+        .search-history-item:hover { background: var(--accent-dim); }
+        .search-history-empty { padding: 8px 12px; font-size: 0.75rem; color: var(--text-dim); }
+        .search-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .search-opts { display: flex; align-items: center; gap: 8px; }
+        .search-opts label { font-size: 0.72rem; color: var(--text-dim); display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+        .search-opts input[type="checkbox"] { accent-color: var(--accent); }
+        .search-nav { display: flex; align-items: center; gap: 2px; }
+        .search-nav button { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; width: 32px; height: 32px; font-size: 1rem; cursor: pointer; transition: background 0.15s, border-color 0.15s; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
+        .search-nav button:hover:not(:disabled) { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
+        .search-nav button:disabled { opacity: 0.4; cursor: default; }
+        .search-status { font-size: 0.78rem; color: var(--text-dim); min-width: 72px; text-align: center; }
+        .search-status.has-matches { color: var(--green); }
+        .search-status.no-matches { color: var(--red); font-weight: 500; }
+        .search-hint { font-size: 0.7rem; color: var(--text-dim); margin-top: 8px; line-height: 1.4; }
+        .search-hint code { background: var(--surface2); padding: 1px 4px; border-radius: 3px; font-size: 0.68rem; }
+        .search-matches-toggle { margin-top: 10px; }
+        .search-matches-toggle button { background: var(--surface2); color: var(--accent); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; cursor: pointer; }
+        .search-matches-toggle button:hover { background: var(--accent-dim); color: #fff; border-color: var(--accent); }
+        .search-matches-list { margin-top: 8px; max-height: min(36vh, 360px); overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+        .search-match-item { display: flex; align-items: center; gap: 10px; padding: 6px 10px; font-size: 0.78rem; font-family: ui-monospace, monospace; cursor: pointer; border-bottom: 1px solid var(--border); color: var(--text); }
+        .search-match-item:last-child { border-bottom: none; }
+        .search-match-item:hover { background: var(--surface2); }
+        .search-match-item.current { background: rgba(108,140,255,0.15); border-left: 3px solid var(--accent); }
+        .search-match-offset { color: var(--text-dim); min-width: 70px; }
+        .search-match-preview { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; max-width: min(640px, 45vw); }
+
+        .hl-search { background: rgba(251,191,36,0.45) !important; color: #000 !important; }
+        .hl-search-cur { background: var(--orange) !important; color: #000 !important; outline: 1px solid var(--orange); }
+
+        .preview-card { display: none; margin-bottom: 10px; flex-shrink: 0; }
+        .preview-card.visible { display: block; }
+        .preview-card .card { padding: 10px 12px; }
+        .preview-card h2 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 8px; }
+        .preview-content { background: var(--bg); border-radius: 8px; min-height: 100px; max-height: min(42vh, 520px); overflow: auto; display: flex; align-items: center; justify-content: center; }
+        .preview-content img { max-width: 100%; max-height: min(42vh, 520px); object-fit: contain; display: block; }
+        .preview-content embed { width: 100%; min-height: min(360px, 40vh); max-height: min(48vh, 600px); border: none; border-radius: 4px; }
+        .preview-placeholder { color: var(--text-dim); font-size: 0.85rem; padding: 24px; text-align: center; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <img src="logo.png" alt="Mimic" class="logo">
+        <h1 data-i18n="inspect.title">File Inspector</h1>
+        <span class="badge" id="fmt-badge">&mdash;</span>
+        <div class="header-right">
+            <a class="back" href="index.html" data-i18n="inspect.back">← Back to scanner</a>
+            <button type="button" class="theme-btn" id="theme-btn" aria-label="Toggle theme">🌙</button>
+            <select class="lang-select" id="lang-select" aria-label="Language">
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="br">Brezhoneg</option>
+                <option value="zh">中文</option>
+            </select>
+        </div>
+    </header>
+    <div class="loading-msg" id="loading-msg" data-i18n="inspect.loading">Loading mimic-view WASM module&hellip;</div>
+    <div id="app-content" style="display:none">
+        <div class="drop-zone" id="drop-zone">
+            <p data-i18n="inspect.dropPrompt">Drop an RTF, PDF, DNG/TIFF, PE/DLL, ELF, ZIP, or RAR file here to inspect &mdash; or click to browse</p>
+            <input type="file" id="file-input">
+        </div>
+        <div class="toolbar" id="toolbar" style="display:none"><span id="file-info"></span></div>
+        <div class="legend" id="legend" style="display:none"></div>
+        <div class="search-panel card" id="search-panel">
+            <div class="search-panel-header" id="search-panel-toggle" title="Click to expand/collapse">
+                <span class="search-panel-title"><span data-i18n="inspect.findInFile">Find in file</span> <kbd>Ctrl+F</kbd></span>
+                <button type="button" class="search-panel-close" id="search-panel-close" data-i18n-title="inspect.close" title="Close" aria-label="Close">&times;</button>
+            </div>
+            <div class="search-panel-body" id="search-panel-body">
+                <div class="search-row">
+                    <div class="search-modes" role="tablist">
+                        <button type="button" class="search-mode-btn active" data-mode="text" aria-selected="true">Text</button>
+                        <button type="button" class="search-mode-btn" data-mode="hex">Hex</button>
+                        <button type="button" class="search-mode-btn" data-mode="regex">Regex</button>
+                    </div>
+                    <div class="search-input-wrap">
+                        <input class="search-input" id="search-input" data-i18n-placeholder="inspect.typeToSearch" placeholder="Type to search…" spellcheck="false" autocomplete="off" aria-label="Search">
+                        <div class="search-history" id="search-history" role="listbox"></div>
+                    </div>
+                    <div class="search-actions">
+                        <div class="search-opts">
+                            <label id="search-case-wrap"><input type="checkbox" id="search-case" aria-label="Case sensitive"> <span data-i18n="inspect.caseSensitive">Aa</span></label>
+                            <label><input type="checkbox" id="search-highlight-all" checked aria-label="Highlight all"> <span data-i18n="inspect.highlightAll">All</span></label>
+                        </div>
+                        <div class="search-nav">
+                            <button type="button" id="search-prev" data-i18n-title="inspect.previous" title="Previous (Shift+Enter)" disabled aria-label="Previous">&lsaquo;</button>
+                            <span class="search-status" id="search-status" aria-live="polite"></span>
+                            <button type="button" id="search-next" data-i18n-title="inspect.next" title="Next (Enter)" disabled aria-label="Next">&rsaquo;</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="search-hint" id="search-hint"></div>
+                <div class="search-matches-toggle" id="search-matches-toggle" style="display:none">
+                    <button type="button" id="search-matches-btn" data-i18n="inspect.showMatches">Show all matches</button>
+                </div>
+                <div class="search-matches-list" id="search-matches-list" style="display:none"></div>
+            </div>
+        </div>
+        <div class="preview-card card" id="preview-card">
+            <h2 data-i18n="inspect.preview">Preview</h2>
+            <div class="preview-content" id="preview-content"></div>
+        </div>
+        <div class="main-grid" id="main-grid" style="display:none">
+            <div class="card"><h2 data-i18n="inspect.hexView">Hex View</h2><div class="hex-container" id="hex-container"></div></div>
+            <div class="card"><h2 id="struct-title" data-i18n="inspect.structure">Structure</h2><div class="structure-panel" id="structure-panel"></div></div>
+        </div>
+    </div>
+</div>
+<script type="module">
+import init, { inspectFile } from './view-pkg/mimic_view.js';
+
+const t = (key) => (window.MimicI18n && window.MimicI18n.t(key)) || key;
+const BPR = 16;
+let fileBytes = null, nodes = [];
+let wasmReady = false;
+let previewBlobUrl = null;
+
+/* ── Search state ── */
+let searchMatches = [];
+let searchCur = -1;
+const MAX_RENDERED = 12288 * BPR;
+
+async function boot() {
+    if (window.MimicI18n) {
+        window.MimicI18n.applyTranslations();
+        const themeBtn = document.getElementById('theme-btn');
+        const langSelect = document.getElementById('lang-select');
+        if (themeBtn) {
+            const updateThemeIcon = () => {
+                themeBtn.textContent = window.MimicI18n.currentTheme === 'light' ? '☀️' : '🌙';
+            };
+            updateThemeIcon();
+            themeBtn.addEventListener('click', () => {
+                window.MimicI18n.setTheme(window.MimicI18n.currentTheme === 'light' ? 'dark' : 'light');
+                updateThemeIcon();
+            });
+        }
+        if (langSelect) {
+            langSelect.value = window.MimicI18n.currentLang;
+            langSelect.addEventListener('change', () => window.MimicI18n.setLang(langSelect.value));
+        }
+    }
+    try {
+        await init();
+        wasmReady = true;
+        document.getElementById('loading-msg').style.display = 'none';
+        document.getElementById('app-content').style.display = 'flex';
+        wireUI();
+    } catch (err) {
+        document.getElementById('loading-msg').textContent = t('inspect.loadFailed') + ' ' + err.message;
+    }
+}
+
+function wireUI() {
+    document.getElementById('drop-zone').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('active'); });
+    document.getElementById('drop-zone').addEventListener('dragleave', e => e.currentTarget.classList.remove('active'));
+    document.getElementById('drop-zone').addEventListener('drop', e => { e.preventDefault(); e.currentTarget.classList.remove('active'); if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]); });
+    document.getElementById('file-input').addEventListener('change', function(){ if (this.files.length) loadFile(this.files[0]); });
+    window.addEventListener('message', e => { if (e.data?.type === 'inspect-file' && e.data.data) processFile(e.data.name||'file', new Uint8Array(e.data.data)); });
+    wireSearch();
+}
+
+async function loadFile(f) { processFile(f.name, new Uint8Array(await f.arrayBuffer())); }
+
+function processFile(name, data) {
+    if (!wasmReady) return;
+    fileBytes = data;
+    document.getElementById('toolbar').style.display = 'flex';
+    document.getElementById('main-grid').style.display = 'grid';
+    document.getElementById('legend').style.display = 'flex';
+    document.getElementById('search-panel').classList.add('visible');
+    document.getElementById('file-info').innerHTML = `<strong>${esc(name)}</strong> &mdash; ${fmtSz(data.length)}`;
+
+    const json = inspectFile(data);
+    const result = JSON.parse(json);
+    const fmt = result.format;
+    nodes = result.nodes;
+
+    document.getElementById('fmt-badge').textContent = fmt.toUpperCase();
+    document.getElementById('struct-title').textContent = fmt.toUpperCase() + ' ' + t('inspect.structure');
+
+    const legendTypes = {
+        rtf: ['header','control','object','data','ole','text','warning'],
+        pdf: ['header','object','stream','xref','data','warning'],
+        dng: ['header','ifd','data','tile','jpeg','warning'],
+        pe: ['header','object','section','data'],
+        elf: ['header','phdr','section','data'],
+        zip: ['header','file','data','warning'],
+        rar: ['header','file'],
+    };
+    setLegend(legendTypes[fmt] || []);
+    clearSearch();
+    updatePreview(data);
+    renderHex(data, nodes);
+    renderStruct(nodes);
+}
+
+function previewType(data) {
+    if (!data || data.length < 12) return null;
+    if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) return 'jpeg';
+    if (data[0] === 0x25 && data[1] === 0x50 && data[2] === 0x44 && data[3] === 0x46) return 'pdf';
+    if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47 && data[4] === 0x0D && data[5] === 0x0A && data[6] === 0x1A && data[7] === 0x0A) return 'png';
+    if (data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46 && (data[3] === 0x38 && (data[4] === 0x37 || data[4] === 0x39) && data[5] === 0x61)) return 'gif';
+    return null;
+}
+
+function updatePreview(data) {
+    if (previewBlobUrl) {
+        URL.revokeObjectURL(previewBlobUrl);
+        previewBlobUrl = null;
+    }
+    const card = document.getElementById('preview-card');
+    const content = document.getElementById('preview-content');
+    if (!card || !content) return;
+    const type = previewType(data);
+    if (!type) {
+        card.classList.remove('visible');
+        content.innerHTML = '';
+        return;
+    }
+    const blob = new Blob([data], { type: type === 'jpeg' ? 'image/jpeg' : type === 'pdf' ? 'application/pdf' : type === 'png' ? 'image/png' : 'image/gif' });
+    previewBlobUrl = URL.createObjectURL(blob);
+    if (type === 'pdf') {
+        content.innerHTML = `<embed src="${previewBlobUrl}#toolbar=1" type="application/pdf" title="PDF preview">`;
+    } else {
+        content.innerHTML = `<img src="${previewBlobUrl}" alt="Preview" loading="lazy">`;
+    }
+    card.classList.add('visible');
+}
+
+const LEGEND_MAP = {
+    header: ['var(--red)','Header'], control: ['var(--accent)','Control'],
+    object: ['var(--purple)','Object'], data: ['var(--orange)','Data/Payload'],
+    ole: ['var(--cyan)','OLE'], text: ['var(--green)','Text'],
+    warning: ['var(--red)','Warning'], stream: ['var(--green)','Stream'],
+    xref: ['var(--purple)','Xref/Trailer'], ifd: ['var(--accent)','IFD Entry'],
+    tile: ['var(--orange)','Tile Data'], jpeg: ['var(--cyan)','JPEG'],
+    section: ['var(--purple)','Section'], phdr: ['var(--accent)','Program Header'],
+    file: ['var(--green)','File in archive'],
+};
+function setLegend(types) {
+    document.getElementById('legend').innerHTML = types.map(t => {
+        const [c,l] = LEGEND_MAP[t]||['var(--text-dim)',t];
+        return `<span><span class="sw" style="background:${c}"></span>${l}</span>`;
+    }).join('');
+}
+
+/* ── Search (panel, modes, history, match list) ── */
+const SEARCH_HISTORY_KEY = 'mimic-inspect-search-history';
+const SEARCH_HISTORY_MAX = 12;
+
+function getSearchHistory() {
+    try {
+        const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
+        return raw ? JSON.parse(raw) : { text: [], hex: [], regex: [] };
+    } catch (_) { return { text: [], hex: [], regex: [] }; }
+}
+function pushSearchHistory(mode, value) {
+    if (!value || value.length > 200) return;
+    const h = getSearchHistory();
+    const arr = h[mode] || [];
+    const filtered = arr.filter(x => x !== value);
+    filtered.unshift(value);
+    h[mode] = filtered.slice(0, SEARCH_HISTORY_MAX);
+    try { localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(h)); } catch (_) {}
+}
+
+const SEARCH_HINTS = {
+    text: 'ASCII/UTF-8 string. Use <code>Aa</code> for case-sensitive.',
+    hex: 'Hex bytes: <code>D0 CF 11 E0</code> or <code>D0CF11E0</code>. Use <code>?</code> as nibble wildcard (e.g. <code>D0 ?? 11</code>).',
+    regex: 'JavaScript regex on the ASCII view (non-printable shown as <code>.</code>). Example: <code>\\\\object|\\\\objdata</code>',
+};
+
+function wireSearch() {
+    const panel = document.getElementById('search-panel');
+    const panelBody = document.getElementById('search-panel-body');
+    const panelToggle = document.getElementById('search-panel-toggle');
+    const panelClose = document.getElementById('search-panel-close');
+    const inputEl = document.getElementById('search-input');
+    const caseWrap = document.getElementById('search-case-wrap');
+    const caseEl = document.getElementById('search-case');
+    const highlightAllEl = document.getElementById('search-highlight-all');
+    const prevBtn = document.getElementById('search-prev');
+    const nextBtn = document.getElementById('search-next');
+    const hintEl = document.getElementById('search-hint');
+    const historyEl = document.getElementById('search-history');
+    const matchesToggle = document.getElementById('search-matches-toggle');
+    const matchesBtn = document.getElementById('search-matches-btn');
+    const matchesList = document.getElementById('search-matches-list');
+
+    let searchMode = 'text';
+    const placeholders = { text: 'Type ASCII text…', hex: 'D0 CF 11 E0 or D0CF11E0…', regex: 'Pattern…' };
+
+    document.querySelectorAll('.search-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            searchMode = btn.dataset.mode;
+            document.querySelectorAll('.search-mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+            document.querySelectorAll('.search-mode-btn').forEach(b => { if (b !== btn) b.setAttribute('aria-selected', 'false'); });
+            inputEl.placeholder = placeholders[searchMode] || 'Search…';
+            caseWrap.style.display = (searchMode === 'text' || searchMode === 'regex') ? '' : 'none';
+            hintEl.innerHTML = SEARCH_HINTS[searchMode] || '';
+            hideHistory();
+            execSearch();
+          });
+    });
+    caseWrap.style.display = '';
+    hintEl.innerHTML = SEARCH_HINTS.text;
+
+    function getMode() { return document.querySelector('.search-mode-btn.active')?.dataset.mode || 'text'; }
+
+    inputEl.addEventListener('focus', () => {
+        const h = getSearchHistory()[getMode()] || [];
+        if (h.length === 0) { historyEl.innerHTML = '<div class="search-history-empty">No recent searches</div>'; historyEl.classList.add('visible'); return; }
+        historyEl.innerHTML = h.map((item, i) => `<div class="search-history-item" data-value="${escAttr(item)}" data-index="${i}">${esc(item.slice(0, 60))}${item.length > 60 ? '…' : ''}</div>`).join('');
+        historyEl.classList.add('visible');
+        historyEl.querySelectorAll('.search-history-item').forEach(el => {
+            el.addEventListener('click', () => { inputEl.value = el.dataset.value || ''; hideHistory(); execSearch(); });
+        });
+    });
+    inputEl.addEventListener('blur', () => { setTimeout(hideHistory, 150); });
+    function hideHistory() { historyEl.classList.remove('visible'); }
+
+    let debounce = null;
+    inputEl.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(execSearch, 320); });
+    caseEl.addEventListener('change', execSearch);
+    highlightAllEl.addEventListener('change', () => { applySearchHighlights(); });
+
+    inputEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) navSearch(-1); else navSearch(1); }
+        if (e.key === 'Escape') { if (inputEl.value) { inputEl.value = ''; execSearch(); } else { panel.classList.remove('visible'); } }
+    });
+    prevBtn.addEventListener('click', () => navSearch(-1));
+    nextBtn.addEventListener('click', () => navSearch(1));
+
+    panelToggle.addEventListener('click', e => { if (e.target === panelClose) return; panelBody.style.display = panelBody.style.display === 'none' ? '' : 'none'; });
+    panelClose.addEventListener('click', e => { e.stopPropagation(); panel.classList.remove('visible'); });
+
+    window.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); panel.classList.add('visible'); panelBody.style.display = ''; inputEl.focus(); }
+    });
+
+    matchesBtn.addEventListener('click', () => {
+        const list = document.getElementById('search-matches-list');
+        const visible = list.style.display !== 'none';
+        list.style.display = visible ? 'none' : 'block';
+        matchesBtn.textContent = visible ? t('inspect.showAllNMatches').replace('{n}', searchMatches.length) : t('inspect.hideMatches');
+      });
+    matchesList.addEventListener('click', onSearchMatchesListClick);
+}
+function escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function clearSearch() {
+    searchMatches = [];
+    searchCur = -1;
+    updateSearchUI();
+    clearSearchHighlights();
+    document.getElementById('search-matches-toggle').style.display = 'none';
+    document.getElementById('search-matches-list').style.display = 'none';
+}
+
+function execSearch() {
+    if (!fileBytes) return;
+    const mode = document.querySelector('.search-mode-btn.active')?.dataset.mode || 'text';
+    const raw = document.getElementById('search-input').value;
+    const caseSensitive = document.getElementById('search-case').checked;
+    const inputEl = document.getElementById('search-input');
+    inputEl.classList.remove('error');
+
+    if (!raw.trim()) { clearSearch(); return; }
+
+    let pattern;
+    try {
+        pattern = buildPattern(mode, raw, caseSensitive);
+    } catch (err) {
+        inputEl.classList.add('error');
+        searchMatches = [];
+        searchCur = -1;
+        const status = document.getElementById('search-status');
+        status.textContent = err.message || 'Invalid';
+        status.classList.remove('has-matches');
+        status.classList.add('no-matches');
+        document.getElementById('search-prev').disabled = true;
+        document.getElementById('search-next').disabled = true;
+        document.getElementById('search-matches-toggle').style.display = 'none';
+        document.getElementById('search-matches-list').style.display = 'none';
+        clearSearchHighlights();
+        return;
+    }
+
+    document.getElementById('search-status').textContent = t('inspect.searching');
+    document.getElementById('search-status').classList.remove('has-matches', 'no-matches');
+    const run = () => {
+        searchMatches = runSearch(pattern, mode, caseSensitive);
+        searchCur = searchMatches.length > 0 ? 0 : -1;
+        pushSearchHistory(mode, raw);
+        updateSearchUI();
+        requestAnimationFrame(() => {
+            applySearchHighlights();
+            renderMatchesList();
+            if (searchCur >= 0) scrollToMatch(searchCur);
+        });
+    };
+    if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(run, { timeout: 100 });
+    } else {
+        setTimeout(run, 0);
+    }
+}
+
+function buildPattern(mode, raw, caseSensitive) {
+    if (mode === 'text') {
+        const bytes = new TextEncoder().encode(raw);
+        if (!bytes.length) throw new Error('Empty');
+        return { type: 'bytes', data: bytes, ci: !caseSensitive };
+    }
+    if (mode === 'hex') {
+        const clean = raw.replace(/[^0-9a-fA-F?]/g, '');
+        if (clean.length < 2) throw new Error('Need >= 1 byte');
+        if (clean.indexOf('?') >= 0) {
+            const nibbles = [];
+            for (let i = 0; i < clean.length - 1; i += 2) {
+                const hi = clean[i], lo = clean[i + 1];
+                nibbles.push({ hi: hi === '?' ? null : parseInt(hi, 16), lo: lo === '?' ? null : parseInt(lo, 16) });
+            }
+            return { type: 'hex-wild', nibbles };
+        }
+        if (clean.length % 2 !== 0) throw new Error('Odd hex length');
+        const bytes = new Uint8Array(clean.length / 2);
+        for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(clean.slice(i*2, i*2+2), 16);
+        return { type: 'bytes', data: bytes, ci: false };
+    }
+    if (mode === 'regex') {
+        const flags = caseSensitive ? 'g' : 'gi';
+        const re = new RegExp(raw, flags);
+        return { type: 'regex', re };
+    }
+    throw new Error('Unknown mode');
+}
+
+function runSearch(pattern, mode, caseSensitive) {
+    const matches = [];
+    const limit = 50000;
+
+    if (pattern.type === 'bytes') {
+        const needle = pattern.data;
+        const haystack = fileBytes;
+        const nlen = needle.length;
+        if (nlen === 0) return matches;
+
+        if (pattern.ci) {
+            const lower = new Uint8Array(nlen);
+            for (let i = 0; i < nlen; i++) {
+                const b = needle[i];
+                lower[i] = (b >= 0x41 && b <= 0x5A) ? b + 0x20 : b;
+            }
+            for (let i = 0; i <= haystack.length - nlen && matches.length < limit; i++) {
+                let ok = true;
+                for (let j = 0; j < nlen; j++) {
+                    let hb = haystack[i + j];
+                    if (hb >= 0x41 && hb <= 0x5A) hb += 0x20;
+                    if (hb !== lower[j]) { ok = false; break; }
+                }
+                if (ok) matches.push({ s: i, e: i + nlen });
+            }
+        } else {
+            for (let i = 0; i <= haystack.length - nlen && matches.length < limit; i++) {
+                let ok = true;
+                for (let j = 0; j < nlen; j++) {
+                    if (haystack[i + j] !== needle[j]) { ok = false; break; }
+                }
+                if (ok) matches.push({ s: i, e: i + nlen });
+            }
+        }
+    } else if (pattern.type === 'hex-wild') {
+        const nibs = pattern.nibbles;
+        const nlen = nibs.length;
+        for (let i = 0; i <= fileBytes.length - nlen && matches.length < limit; i++) {
+            let ok = true;
+            for (let j = 0; j < nlen; j++) {
+                const b = fileBytes[i + j];
+                const { hi, lo } = nibs[j];
+                if (hi !== null && ((b >> 4) & 0xF) !== hi) { ok = false; break; }
+                if (lo !== null && (b & 0xF) !== lo) { ok = false; break; }
+            }
+            if (ok) matches.push({ s: i, e: i + nlen });
+        }
+    } else if (pattern.type === 'regex') {
+        const maxBytes = 2097152;
+        const cap = Math.min(fileBytes.length, maxBytes);
+        const ascii = new Array(cap);
+        for (let i = 0; i < cap; i++) {
+            const b = fileBytes[i];
+            ascii[i] = (b >= 0x20 && b <= 0x7E) ? String.fromCharCode(b) : '.';
+        }
+        const text = ascii.join('');
+        const re = pattern.re;
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(text)) !== null && matches.length < limit) {
+            if (m[0].length === 0) { re.lastIndex++; continue; }
+            matches.push({ s: m.index, e: m.index + m[0].length });
+        }
+    }
+
+    return matches;
+}
+
+function updateSearchUI() {
+    const status = document.getElementById('search-status');
+    const prevBtn = document.getElementById('search-prev');
+    const nextBtn = document.getElementById('search-next');
+    const matchesToggle = document.getElementById('search-matches-toggle');
+    status.classList.remove('has-matches', 'no-matches');
+    if (searchMatches.length === 0) {
+        const hasInput = document.getElementById('search-input').value.trim();
+        status.textContent = hasInput ? t('inspect.noMatches') : '';
+        if (hasInput) status.classList.add('no-matches');
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        matchesToggle.style.display = 'none';
+    } else {
+        const suffix = searchMatches.length >= 50000 ? '+' : '';
+        status.textContent = `${searchCur + 1} of ${searchMatches.length}${suffix}`;
+        status.classList.add('has-matches');
+        prevBtn.disabled = searchMatches.length <= 1;
+        nextBtn.disabled = searchMatches.length <= 1;
+        matchesToggle.style.display = 'block';
+    }
+}
+
+function navSearch(dir) {
+    if (searchMatches.length === 0) return;
+    searchCur = (searchCur + dir + searchMatches.length) % searchMatches.length;
+    updateSearchUI();
+    applySearchHighlights();
+    scrollToMatch(searchCur);
+}
+
+function clearSearchHighlights() {
+    const container = document.getElementById('hex-container');
+    if (!container) return;
+    const el = container.querySelectorAll('.hl-search, .hl-search-cur');
+    for (let i = 0; i < el.length; i++) {
+        el[i].classList.remove('hl-search', 'hl-search-cur');
+    }
+}
+
+function applySearchHighlights() {
+    clearSearchHighlights();
+    if (!searchMatches.length) return;
+    const container = document.getElementById('hex-container');
+    if (!container) return;
+    const highlightAll = document.getElementById('search-highlight-all').checked;
+    const curSet = new Set();
+    const otherSet = highlightAll ? new Set() : null;
+    const maxOtherBytes = 80000;
+    let otherBytes = 0;
+    for (let mi = 0; mi < searchMatches.length; mi++) {
+        const m = searchMatches[mi];
+        for (let j = m.s; j < m.e && j < MAX_RENDERED; j++) {
+            if (mi === searchCur) curSet.add(j);
+            else if (highlightAll && otherBytes < maxOtherBytes) {
+                otherSet.add(j);
+                otherBytes++;
+            }
+        }
+    }
+    const allCells = container.querySelectorAll('[data-i]');
+    for (let i = 0; i < allCells.length; i++) {
+        const el = allCells[i];
+        const idx = parseInt(el.getAttribute('data-i'), 10);
+        if (curSet.has(idx)) el.classList.add('hl-search-cur');
+        else if (otherSet && otherSet.has(idx)) el.classList.add('hl-search');
+    }
+}
+
+function scrollToMatch(idx) {
+    if (idx < 0 || idx >= searchMatches.length) return;
+    const m = searchMatches[idx];
+    scrollHex(m.s);
+    selRange(m.s, m.e);
+    const structNode = nodes.find(n => m.s >= n.s && m.s < n.e);
+    if (structNode) hlNode(structNode);
+    document.querySelectorAll('.search-match-item.current').forEach(el => el.classList.remove('current'));
+    const listEl = document.querySelector(`.search-match-item[data-match-idx="${idx}"]`);
+    if (listEl) { listEl.classList.add('current'); listEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+}
+
+function previewAt(s, e, maxLen) {
+    if (!fileBytes) return '';
+    const len = Math.min(e - s, maxLen || 32);
+    let out = '';
+    for (let i = 0; i < len; i++) {
+        const b = fileBytes[s + i];
+        out += (b >= 0x20 && b <= 0x7E) ? String.fromCharCode(b) : '.';
+    }
+    return out + (e - s > (maxLen || 32) ? '…' : '');
+}
+
+function renderMatchesList() {
+    const toggle = document.getElementById('search-matches-toggle');
+    const btn = document.getElementById('search-matches-btn');
+    const list = document.getElementById('search-matches-list');
+    if (searchMatches.length === 0) { toggle.style.display = 'none'; list.style.display = 'none'; return; }
+    toggle.style.display = 'block';
+    btn.textContent = t('inspect.showAllNMatches').replace('{n}', searchMatches.length);
+    const cap = 500;
+    const items = searchMatches.slice(0, cap);
+    list.innerHTML = items.map((m, i) => {
+        const off = '0x' + m.s.toString(16).toUpperCase().padStart(8, '0');
+        const prev = esc(previewAt(m.s, m.e, 24));
+        return `<div class="search-match-item" data-match-idx="${i}" data-s="${m.s}" data-e="${m.e}"><span class="search-match-offset">${off}</span><span class="search-match-preview">${prev || '(data)'}</span></div>`;
+    }).join('');
+    if (searchMatches.length > cap) list.innerHTML += `<div style="padding:6px 10px;font-size:0.72rem;color:var(--text-dim);">… and ${searchMatches.length - cap} more</div>`;
+    list.style.display = 'none';
+    const curEl = list.querySelector(`.search-match-item[data-match-idx="${searchCur}"]`);
+    if (curEl) curEl.classList.add('current');
+}
+
+function onSearchMatchesListClick(e) {
+    const item = e.target.closest('.search-match-item');
+    if (!item) return;
+    const idx = parseInt(item.dataset.matchIdx, 10);
+    searchCur = idx;
+    updateSearchUI();
+    applySearchHighlights();
+    scrollToMatch(idx);
+}
+
+/* ── Rendering ── */
+const TYPE_PRIO_MAP = {warning:9,ole:8,jpeg:7,data:6,stream:6,tile:6,object:5,xref:5,section:5,file:5,ifd:4,phdr:4,control:3,header:2,text:1};
+const HL_CLS = {1:'hl-text',2:'hl-header',3:'hl-control',4:'hl-ifd',5:'hl-object',6:'hl-data',7:'hl-jpeg',8:'hl-ole',9:'hl-warning'};
+
+function buildMap(nodes) {
+    const m = new Uint8Array(fileBytes.length);
+    for (const n of nodes) { const p = TYPE_PRIO_MAP[n.t]||0; for (let j=n.s; j<n.e && j<m.length; j++) if (p>m[j]) m[j]=p; }
+    return m;
+}
+
+function renderHex(data, nodes) {
+    const c = document.getElementById('hex-container');
+    const hm = buildMap(nodes);
+    const rows = Math.ceil(data.length/BPR), mr = Math.min(rows, 8192);
+    let h = '<table class="hex-table"><tbody>';
+    for (let r=0; r<mr; r++) {
+        const off = r*BPR;
+        h += '<tr><td class="offset">' + off.toString(16).padStart(8,'0') + '</td>';
+        for (let col=0; col<BPR; col++) {
+            if (col===8) h += '<td class="hs"></td>';
+            const idx = off+col;
+            if (idx<data.length) { const cls = HL_CLS[hm[idx]]||''; h += `<td class="hc ${cls}" data-i="${idx}">${data[idx].toString(16).padStart(2,'0')}</td>`; }
+            else h += '<td class="hc">  </td>';
+        }
+        h += '<td class="ac">';
+        for (let col=0; col<BPR; col++) {
+            const idx = off+col;
+            if (idx<data.length) { const b = data[idx]; const ch = (b>=0x20&&b<=0x7e)?String.fromCharCode(b):'.'; const cls = HL_CLS[hm[idx]]||''; h += `<span class="as ${cls}" data-i="${idx}">${esc(ch)}</span>`; }
+        }
+        h += '</td></tr>';
+    }
+    if (rows>mr) h += `<tr><td colspan="${BPR+4}" style="text-align:center;color:var(--text-dim);padding:10px;">First ${mr*BPR} of ${data.length} bytes shown</td></tr>`;
+    h += '</tbody></table>';
+    c.innerHTML = h;
+
+    let hexDragStart = null;
+    let hexDragIdx = null;
+
+    function getByteIndex(el) {
+        const cell = el && el.closest && el.closest('[data-i]');
+        return cell ? parseInt(cell.dataset.i, 10) : -1;
+    }
+
+    c.addEventListener('mousedown', e => {
+        const idx = getByteIndex(e.target);
+        if (idx < 0) return;
+        e.preventDefault();
+        hexDragStart = idx;
+        hexDragIdx = idx;
+        selRange(idx, idx + 1);
+        const n = nodes.find(n => idx >= n.s && idx < n.e);
+        if (n) hlNode(n);
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (hexDragStart == null) return;
+        const idx = getByteIndex(e.target);
+        if (idx >= 0) hexDragIdx = idx;
+        const lo = Math.min(hexDragStart, hexDragIdx);
+        const hi = Math.max(hexDragStart, hexDragIdx);
+        selRange(lo, hi + 1);
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (hexDragStart != null) {
+            const lo = Math.min(hexDragStart, hexDragIdx);
+            const hi = Math.max(hexDragStart, hexDragIdx);
+            const n = nodes.find(n => lo >= n.s && lo < n.e);
+            if (n) hlNode(n);
+        }
+        hexDragStart = null;
+        hexDragIdx = null;
+    });
+}
+
+function renderStruct(nodes) {
+    const p = document.getElementById('structure-panel');
+    if (!nodes.length) { p.innerHTML = '<div style="color:var(--text-dim);padding:16px;text-align:center;">' + t('inspect.noStructure') + '</div>'; return; }
+    let h = '';
+    for (let i=0; i<nodes.length; i++) {
+        const n = nodes[i];
+        h += `<div class="sn t-${n.t}" data-ni="${i}"><span class="no">${n.s.toString(16).padStart(8,'0')}–${n.e.toString(16).padStart(8,'0')}</span> <span class="nl">${esc(n.l)}</span>${n.d?`<div class="nd">${esc(n.d)}</div>`:''}</div>`;
+    }
+    p.innerHTML = h;
+    p.addEventListener('click', e => {
+        const el = e.target.closest('.sn'); if (!el) return;
+        const n = nodes[+el.dataset.ni]; if (!n) return;
+        hlNode(n); selRange(n.s, n.e); scrollHex(n.s);
+    });
+}
+
+function hlNode(node) {
+    document.querySelectorAll('.sn.active').forEach(e => e.classList.remove('active'));
+    const i = nodes.indexOf(node); if (i>=0) { const el = document.querySelector(`.sn[data-ni="${i}"]`); if (el) { el.classList.add('active'); el.scrollIntoView({block:'nearest'}); } }
+}
+function selRange(s, e) {
+    const container = document.getElementById('hex-container');
+    if (!container) return;
+    const all = container.querySelectorAll('[data-i]');
+    for (let i = 0; i < all.length; i++) {
+        const el = all[i];
+        const idx = parseInt(el.getAttribute('data-i'), 10);
+        if (idx >= s && idx < e) el.classList.add('sel');
+        else el.classList.remove('sel');
+    }
+}
+function scrollHex(off) {
+    const r = Math.floor(off/BPR); const tr = document.querySelectorAll('.hex-table tr')[r]; if (tr) tr.scrollIntoView({block:'center',behavior:'smooth'});
+}
+
+function fmtSz(b) { return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KiB':(b/1048576).toFixed(1)+' MiB'; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+boot();
+</script>
+</body>
+</html>
